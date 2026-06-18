@@ -1,77 +1,127 @@
-🌌 Knowledge Constellation Explorer
+<div align="center">
 
-Turn any topic into an interactive "star map" of connected concepts.
-Big stars = major ideas, small stars = the granular details (parameters, headers,
-mechanisms, edge cases). Click a star to read a plain-language deep explanation,
-add your own notes, or expand it to dig even deeper.
+# Knowledge Constellation Explorer
 
-Works for IT infrastructure, authentication, security, deep learning, healthcare,
-finance — literally anything. Powered by your own free Google Gemini API key.
+**Type a topic. Watch it explode into a map of stars you can actually explore.**
 
- Features
+Big stars are the main ideas. Little stars are the messy details that usually make your brain freeze. Click any of them to get a plain-English explanation, dig deeper, and scribble your own notes.
 
-    AI-generated concept graphs from a single topic
-    Three levels: central → major components → minor details
-    Click a star → simple-but-precise explanation
-    Double-click (or "Expand") a star → AI generates deeper child nodes
-    Notes you can attach to any node (saved in your browser)
-    Save / Load a whole constellation (also downloads a .json you can share)
-    Drag & drop a saved .json onto the page to reopen it
-    Pan, zoom, drag nodes around
-    100% static — no backend, no cost to host
+![Static](https://img.shields.io/badge/Type-Single_HTML_File-1f6feb?style=for-the-badge)
+![Cost](https://img.shields.io/badge/Hosting-Free_Forever-3fb950?style=for-the-badge)
+![Powered](https://img.shields.io/badge/Powered_by-Gemini-a371f7?style=for-the-badge)
+![Backend](https://img.shields.io/badge/Backend-None_Needed-8b949e?style=for-the-badge)
 
- Step 1 — Get a free Gemini API key
+</div>
 
-    Go to https://aistudio.google.com/apikey
-    Sign in with a Google account → Create API key
-    Copy the key (it starts with AIza...)
-    Paste it into the app's "Gemini API key" box
+---
 
-    The free tier allows a limited number of requests per minute/day. If you see a
-    "rate limit" message, just wait ~30 seconds. The app remembers your key in your
-    browser so you only paste it once.
+## The 60-second pitch
 
- Step 2 — Publish it FREE on GitHub Pages (lifetime)
+> You finish a course. You *get* the logic. Then you open a real system — a real request, a real chart, a real workflow — and there are twenty things you've never seen and your brain just goes blank.
 
-You don't need to know how to code. Just follow these clicks.
-A. Create the repository
+This fixes that. Instead of reading about a concept top-to-bottom like a textbook, you **see** it: the core idea in the middle, the major pieces branching out, and every tiny detail hanging off them as its own little star. Your eyes do the remembering.
 
-    Make a free account at https://github.com
-    Click the + (top right) → New repository
-    Name it e.g. constellation-explorer
-    Set it to Public, then click Create repository
+Works for anything — IT, security, healthcare, finance, biology, whatever you're stuck on.
 
-B. Upload the file
+---
 
-    On the new repo page click "uploading an existing file"
-    (or Add file → Upload files)
-    Drag in index.html (this file from the project)
-    Click Commit changes
+## Textbook vs. this thing
 
-C. Turn on GitHub Pages
+| | The usual way | Constellation Explorer |
+|---|---|---|
+| **Format** | Wall of text | A living map of stars |
+| **Detail** | Buried in paragraphs | Each detail is its own star |
+| **Going deeper** | Flip more pages | Double-click → new branch grows |
+| **Your notes** | Separate doc you'll lose | Stuck right onto the star |
+| **Recall** | Re-read it 3 times | You *picture* where things sit |
+| **Cost** | $$ courses | $0 |
 
-    In the repo go to Settings (top menu)
-    Left sidebar → Pages
-    Under "Build and deployment" → Source, choose Deploy from a branch
-    Branch: main, folder: / (root) → click Save
-    Wait ~1 minute, refresh. You'll see:
-    "Your site is live at https://YOUR-USERNAME.github.io/constellation-explorer/"
+---
 
-That URL is your permanent, free, shareable tool. 
-Anyone can open it in a browser, paste their own free key, and start exploring.
+## How it's wired
 
-Updating later
+```
+                 ┌─────────────────┐
+                 │   CENTRAL IDEA  │   ← the topic you typed
+                 └────────┬────────┘
+            ┌─────────────┼─────────────┐
+        ┌───┴───┐     ┌───┴───┐     ┌───┴───┐
+        │ Major │     │ Major │     │ Major │   ← the main pieces
+        └───┬───┘     └───┬───┘     └───────┘
+          ┌─┴─┐         ┌─┴─┐
+        ┌─┴─┐ ┌┴─┐    ┌─┴─┐ ┌┴─┐
+        │ • │ │• │    │ • │ │• │   ← the tiny details (headers,
+        └───┘ └──┘    └───┘ └──┘      params, edge cases…)
+```
 
-Edit index.html directly on GitHub (pencil icon) → Commit. Pages redeploys
-automatically in about a minute.
+Click a star for the explanation. Double-click it to grow a fresh set of deeper stars off that exact point.
 
-A note on the API key
+---
 
-The key lives only in the user's own browser (localStorage) and is sent straight
-to Google's API — it never goes to any server of yours. Each person who uses your
-published tool brings their own free key, so it costs you nothing no matter
-how many people use it.
+## What you can actually do with it
 
-Run locally first (optional)
+| Action | What happens |
+|---|---|
+| **Type a topic + Map** | AI builds the whole star map |
+| **Click a star** | Plain-English explanation pops up |
+| **Double-click a star** | It branches deeper into new stars |
+| **Write a note** | Sticks to that star, saved in your browser |
+| **Save** | Keeps the map + downloads a file you can share |
+| **Drag a saved file in** | Reopens that map instantly |
+| **Scroll / drag** | Zoom and rearrange the galaxy |
 
-Just double-click index.html — it opens in your browser. No install needed.
+---
+
+## Get going in 3 steps
+
+**1. Grab a free Gemini key** → https://aistudio.google.com/apikey
+Sign in with any Google account, hit *Create API key*, copy the thing that starts with `AIza...`
+
+**2. Open the app** → just double-click `index.html`. That's the whole install.
+
+**3. Paste the key, type a topic, hit Map.** Done.
+
+> The free tier limits how many requests you get per minute. If it asks you to slow down, wait ~30 seconds. The app remembers your key so you only paste it once.
+
+---
+
+## Putting it online for free (and keeping it there)
+
+No coding. Just clicking. Here's the whole journey:
+
+| Step | Where | What to click |
+|---|---|---|
+| 1 | github.com | **+** (top right) → **New repository** |
+| 2 | New repo | Name it `constellation-explorer`, keep it **Public**, **Create** |
+| 3 | Repo page | **"uploading an existing file"** → drag in `index.html` → **Commit** |
+| 4 | **Settings → Pages** | Source: **Deploy from a branch** |
+| 5 | Same screen | Branch **main**, folder **/ (root)** → **Save** |
+| 6 | Wait ~1 min, refresh | Grab your live link |
+
+Your link comes out looking like:
+
+```
+https://your-username.github.io/constellation-explorer/
+```
+
+That's yours for good. Send it to anyone — they open it, paste their own free key, and start exploring.
+
+**Want to change something later?** Click the pencil icon on `index.html` right there on GitHub, edit, commit. It re-publishes itself in about a minute.
+
+---
+
+## "Wait, what about my API key?"
+
+| Worry | Reality |
+|---|---|
+| Does my key go to some server? | No — there is no server. It lives only in your browser and talks straight to Google. |
+| Will it cost me if lots of people use my link? | No. Everyone brings *their own* free key. Your bill stays at $0 no matter the traffic. |
+| Do I have to retype it every time? | No — the app saves it locally for you. |
+
+---
+
+<div align="center">
+
+**Built because freezing up in front of a real system is the worst feeling — and a map beats a wall of text every time.**
+
+</div>
