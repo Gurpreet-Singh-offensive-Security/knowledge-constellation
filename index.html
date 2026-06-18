@@ -3,39 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Knowledge Constellation</title>
+    <title>Knowledge Constellation Explorer</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
-        body { margin: 0; padding: 0; background-color: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow: hidden; }
-        #ui-panel { position: absolute; top: 20px; left: 20px; width: 320px; background: rgba(22, 27, 34, 0.9); padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid #30363d; z-index: 10; }
-        #info-panel { position: absolute; top: 20px; right: 20px; width: 350px; background: rgba(22, 27, 34, 0.9); padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 1px solid #30363d; z-index: 10; display: none; max-height: 80vh; overflow-y: auto; }
-        h2 { margin-top: 0; font-size: 1.2rem; color: #58a6ff; }
-        input[type="text"], input[type="password"] { width: 100%; padding: 10px; margin: 10px 0; background: #010409; border: 1px solid #30363d; color: white; border-radius: 6px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #238636; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        button:hover { background: #2ea043; }
-        #graph-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
-        .links line { stroke: #30363d; stroke-opacity: 0.6; }
-        .nodes circle { stroke: #fff; stroke-width: 1.5px; cursor: pointer; transition: 0.2s; }
-        .nodes circle:hover { stroke: #58a6ff; stroke-width: 3px; }
-        .node-label { font-size: 12px; fill: #8b949e; pointer-events: none; }
-        #loading { display: none; color: #8b949e; margin-top: 10px; font-size: 0.9rem; text-align: center; }
+        /* Deep space background */
+        body { 
+            margin: 0; 
+            padding: 0; 
+            background-color: #060913; 
+            color: #c9d1d9; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            overflow: hidden; 
+            position: relative;
+        }
+
+        /* Animated CSS Galaxy Stars Background */
+        .stars-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 50%, #0d162d 0%, #060913 100%);
+            z-index: 0;
+            overflow: hidden;
+        }
+        .stars-bg::after {
+            content: "";
+            position: absolute;
+            width: 3px; height: 3px;
+            background: transparent;
+            box-shadow: 
+                10vw 20vh #fff, 25vw 12vh rgba(255,255,255,0.7), 45vw 70vh #fff, 
+                85vw 30vh rgba(255,255,255,0.4), 70vw 85vh #fff, 15vw 80vh rgba(255,255,255,0.8),
+                60vw 15vh #fff, 90vw 75vh rgba(255,255,255,0.6), 35vw 50vh #fff, 50vw 35vh rgba(255,255,255,0.5);
+            border-radius: 50%;
+            animation: twinkle 4s infinite ease-in-out alternate;
+        }
+        @keyframes twinkle {
+            0% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
+        /* Cyberpunk Glassmorphism Floating UI Control Panel */
+        #ui-panel { 
+            position: absolute; 
+            top: 25px; 
+            left: 25px; 
+            width: 340px; 
+            background: rgba(10, 15, 30, 0.75); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 24px; 
+            border-radius: 16px; 
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.7), 0 0 15px rgba(88, 166, 255, 0.2); 
+            border: 1px solid rgba(88, 166, 255, 0.2); 
+            z-index: 10; 
+        }
+
+        /* Floating Info Detail Panel */
+        #info-panel { 
+            position: absolute; 
+            top: 25px; 
+            right: 25px; 
+            width: 365px; 
+            background: rgba(10, 15, 30, 0.85); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 24px; 
+            border-radius: 16px; 
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.7), 0 0 20px rgba(31, 111, 235, 0.3); 
+            border: 1px solid rgba(31, 111, 235, 0.3); 
+            z-index: 10; 
+            display: none; 
+            max-height: 80vh; 
+            overflow-y: auto; 
+        }
+
+        h2 { margin-top: 0; font-size: 1.3rem; color: #58a6ff; font-weight: 600; letter-spacing: 0.5px; }
+        
+        input[type="text"], input[type="password"] { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            background: rgba(1, 4, 9, 0.6); 
+            border: 1px solid #30363d; 
+            color: white; 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+            transition: 0.3s;
+        }
+        input[type="text"]:focus, input[type="password"]:focus {
+            border-color: #58a6ff;
+            outline: none;
+            box-shadow: 0 0 8px rgba(88, 166, 255, 0.3);
+        }
+
+        button { 
+            width: 100%; 
+            padding: 12px; 
+            background: linear-gradient(135deg, #1f6feb 0%, #1152b3 100%); 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 0.95rem;
+            transition: 0.3s; 
+            box-shadow: 0 4px 12px rgba(31, 111, 235, 0.3);
+        }
+        button:hover { 
+            background: linear-gradient(135deg, #388bfd 0%, #1f6feb 100%); 
+            box-shadow: 0 4px 18px rgba(56, 139, 253, 0.5);
+            transform: translateY(-1px);
+        }
+
+        #graph-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        /* Subtle constellation lines */
+        .links line { stroke: #444d56; stroke-opacity: 0.4; stroke-width: 1.5px; }
+        
+        /* Glowing Star Nodes */
+        .nodes circle { cursor: pointer; transition: 0.3s; }
+        
+        .node-label { 
+            font-size: 13px; 
+            fill: #adbac7; 
+            font-weight: 500;
+            pointer-events: none; 
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+        
+        #loading { display: none; color: #8b949e; margin-top: 12px; font-size: 0.85rem; text-align: center; font-style: italic; }
     </style>
 </head>
 <body>
 
+    <div class="stars-bg"></div>
+
     <div id="ui-panel">
-        <h2>Constellation Explorer</h2>
-        <p style="font-size: 0.8rem; color: #8b949e;">Map out any concept deeply. E.g., "GET /login request authentication flow".</p>
+        <h2>🌌 Constellation Explorer</h2>
+        <p style="font-size: 0.8rem; color: #8b949e; margin-bottom: 15px;">Deep-dive into concepts. Watch parameters connect like cosmic star systems.</p>
         <input type="password" id="api-key" placeholder="Enter free Gemini API Key">
         <input type="text" id="topic-input" placeholder="What do you want to learn?">
-        <button onclick="generateGraph()">Generate Constellation</button>
-        <div id="loading">Generating nodes and deep explanations... this takes a moment.</div>
+        <button onclick="generateGraph()">Map Concept</button>
+        <div id="loading">✨ Mapping galaxy configurations...</div>
     </div>
 
     <div id="info-panel">
-        <h2 id="info-title">Concept</h2>
-        <p id="info-desc" style="font-size: 0.95rem; line-height: 1.5;"></p>
-        <button onclick="closeInfo()" style="background: #30363d; margin-top: 15px;">Close</button>
+        <h2 id="info-title">Concept Node</h2>
+        <p id="info-desc" style="font-size: 0.95rem; line-height: 1.6; color: #adbac7;"></p>
+        <button onclick="closeInfo()" style="background: #21262d; box-shadow: none; margin-top: 15px;">Close Data Stream</button>
     </div>
 
     <div id="graph-container"></div>
@@ -45,15 +160,21 @@
         const width = window.innerWidth;
         const height = window.innerHeight;
 
-        // Initialize D3 canvas
         svg = d3.select("#graph-container").append("svg")
             .attr("width", width)
             .attr("height", height);
 
+        // Add a neon glow filter for the stars
+        const defs = svg.append("defs");
+        const filter = defs.append("filter").attr("id", "glow");
+        filter.append("feGaussianBlur").attr("stdDeviation", "3.5").attr("result", "coloredBlur");
+        const feMerge = filter.append("feMerge");
+        feMerge.append("feMergeNode").attr("in", "coloredBlur");
+        feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
         const g = svg.append("g");
 
-        // Allow zooming and panning around the galaxy
-        svg.call(d3.zoom().on("zoom", (event) => {
+        svg.call(d3.zoom().scaleExtent([0.2, 3]).on("zoom", (event) => {
             g.attr("transform", event.transform);
         }));
 
@@ -62,23 +183,23 @@
             const topic = document.getElementById('topic-input').value.trim();
             
             if (!apiKey || !topic) {
-                alert("Please enter both an API key and a topic.");
+                alert("Please provide your Gemini API key and a topic topic to explore.");
                 return;
             }
 
             document.getElementById('loading').style.display = 'block';
 
-            const prompt = `You are an expert IT and deep-learning tutor. Map out the concept: "${topic}". 
-            Break it down into a central concept, major sub-concepts, and highly detailed minor parameters/functions.
-            Return ONLY a valid JSON object. Do not use Markdown formatting or code blocks. Just raw JSON.
+            const prompt = `You are an expert technical infrastructure and cybersecurity instructor. Map out the concept: "${topic}". 
+            Break it down systematically into major structures, and critically, the minor parameters/attributes/headers/mechanisms involved.
+            Return ONLY a valid JSON object. Do not wrap it in markdown formatting or code blocks. Just raw clean JSON text.
             Structure:
             {
               "nodes": [
-                {"id": "Central Topic Name", "group": 1, "description": "High-level overview..."},
-                {"id": "Sub Concept", "group": 2, "description": "Deep dive explanation..."}
+                {"id": "Central Topic", "group": 1, "description": "High-level contextual core..."},
+                {"id": "Sub Parameter/Component", "group": 2, "description": "Technical granular deep dive details..."}
               ],
               "links": [
-                {"source": "Central Topic Name", "target": "Sub Concept"}
+                {"source": "Central Topic", "target": "Sub Parameter/Component"}
               ]
             }`;
 
@@ -91,26 +212,24 @@
 
                 const data = await response.json();
                 let textResponse = data.candidates[0].content.parts[0].text;
-                
-                // Clean up any accidental markdown the AI might output
                 textResponse = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
                 const graphData = JSON.parse(textResponse);
 
                 renderGraph(graphData);
             } catch (error) {
                 console.error(error);
-                alert("Error generating graph. Check your API key or try a different topic.");
+                alert("Failed to map space coordinates. Verify your API Key configuration.");
             } finally {
                 document.getElementById('loading').style.display = 'none';
             }
         }
 
         function renderGraph(data) {
-            g.selectAll("*").remove(); // Clear previous stars
+            g.selectAll("*").remove();
 
             simulation = d3.forceSimulation(data.nodes)
-                .force("link", d3.forceLink(data.links).id(d => d.id).distance(150))
-                .force("charge", d3.forceManyBody().strength(-300))
+                .force("link", d3.forceLink(data.links).id(d => d.id).distance(140))
+                .force("charge", d3.forceManyBody().strength(-400))
                 .force("center", d3.forceCenter(width / 2, height / 2));
 
             link = g.append("g")
@@ -124,8 +243,10 @@
                 .selectAll("circle")
                 .data(data.nodes)
                 .enter().append("circle")
-                .attr("r", d => d.group === 1 ? 15 : 8)
-                .attr("fill", d => d.group === 1 ? "#58a6ff" : "#1f6feb")
+                .attr("r", d => d.group === 1 ? 16 : 8)
+                .attr("fill", d => d.group === 1 ? "#79c0ff" : "#58a6ff")
+                .attr("filter", "url(#glow)") // Applies neon star glow
+                .style("opacity", d => d.group === 1 ? 1 : 0.85)
                 .call(drag(simulation))
                 .on("click", showInfo);
 
@@ -135,8 +256,8 @@
                 .enter().append("text")
                 .attr("class", "node-label")
                 .text(d => d.id)
-                .attr("dx", 15)
-                .attr("dy", 4);
+                .attr("dx", 18)
+                .attr("dy", 5);
 
             simulation.on("tick", () => {
                 link.attr("x1", d => d.source.x)
