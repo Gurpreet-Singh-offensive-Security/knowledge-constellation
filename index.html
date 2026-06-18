@@ -95,6 +95,9 @@
   .badge { display:inline-block; font-size:0.7rem; padding:2px 8px; border-radius:20px; background:rgba(88,166,255,0.15); color:var(--accent); margin-bottom:8px; }
   .hint { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:5; font-size:0.75rem; color:#6e7681; background:rgba(10,15,30,0.6); padding:6px 14px; border-radius:20px; backdrop-filter:blur(6px); text-align:center; }
   #galaxy-count { position:absolute; bottom:14px; right:18px; z-index:5; font-size:0.75rem; color:#6e7681; background:rgba(10,15,30,0.6); padding:6px 12px; border-radius:20px; backdrop-filter:blur(6px); }
+  #credit { position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:5; font-size:0.72rem; }
+  #credit a { color:#6e7681; text-decoration:none; opacity:0.85; transition:0.2s; }
+  #credit a:hover { color:#58a6ff; opacity:1; }
   a { color: var(--accent); }
   .saved-note { margin-top:12px; padding:10px; border-radius:8px; background:rgba(63,185,80,0.08); border:1px solid rgba(63,185,80,0.3); font-size:0.85rem; white-space:pre-wrap; display:none; }
 </style>
@@ -162,6 +165,11 @@
   <div id="graph-container"></div>
   <div class="hint">Click a star = details &nbsp;•&nbsp; Double-click = expand &nbsp;•&nbsp; Scroll = zoom &nbsp;•&nbsp; Zoom out to see all galaxies &nbsp;•&nbsp; Click a galaxy's name = rename / delete it</div>
   <div id="galaxy-count"></div>
+  <div id="credit">
+    <a href="https://github.com/Gurpreet-Singh-offensive-Security/knowledge-constellation" target="_blank" rel="noopener">
+      Knowledge Constellation Explorer — created by Gurpreet Singh (@Gurpreet-Singh-offensive-Security)
+    </a>
+  </div>
 
 <script>
 /* ---------------- Background stars ---------------- */
@@ -839,5 +847,5 @@ document.getElementById('topic-input').addEventListener('keydown', e=>{ if(e.key
   showWelcome();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0dc2c3919ebb634',t:'MTc4MTgwNTQwOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0dc40f42f4fac3f',t:'MTc4MTgwNjI1Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
