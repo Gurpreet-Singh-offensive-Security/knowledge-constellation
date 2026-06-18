@@ -83,16 +83,18 @@
 
   #graph-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
   .links line { stroke: #444d56; stroke-opacity: 0.45; stroke-width: 1.5px; }
-  .nodes circle { cursor: pointer; transition: r 0.2s, stroke 0.2s; }
-  .nodes circle:hover { stroke: #fff; stroke-width: 2px; }
-  .node-label { font-size: 13px; fill: #adbac7; font-weight: 500; pointer-events: none; text-shadow: 0 2px 4px rgba(0,0,0,0.85); }
+  circle.nd { cursor: pointer; transition: stroke 0.2s; }
+  circle.nd:hover { stroke: #fff; stroke-width: 2px; }
+  .node-label { font-size: 13px; fill: #adbac7; font-weight: 500; pointer-events: none; text-shadow: 0 2px 4px rgba(0,0,0,0.85); transition: opacity 0.25s; }
+  .galaxy-title { fill: #79c0ff; font-weight: 700; pointer-events: none; text-anchor: middle; text-shadow: 0 2px 10px rgba(0,0,0,0.95); opacity: 0; transition: opacity 0.3s; }
 
   #loading { display: none; color: #8b949e; margin-top: 12px; font-size: 0.85rem; text-align: center; font-style: italic; }
   #err { display:none; margin-top:10px; padding:10px; border-radius:8px; background:rgba(248,81,73,0.12); border:1px solid rgba(248,81,73,0.4); color:#ff7b72; font-size:0.8rem; }
   #ok { display:none; margin-top:10px; padding:10px; border-radius:8px; background:rgba(63,185,80,0.12); border:1px solid rgba(63,185,80,0.4); color:#56d364; font-size:0.8rem; }
   #ok .sharebox { width:100%; margin-top:8px; padding:8px; font-size:0.75rem; background:rgba(1,4,9,0.6); border:1px solid var(--line); color:#adbac7; border-radius:6px; word-break:break-all; }
   .badge { display:inline-block; font-size:0.7rem; padding:2px 8px; border-radius:20px; background:rgba(88,166,255,0.15); color:var(--accent); margin-bottom:8px; }
-  .hint { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:5; font-size:0.75rem; color:#6e7681; background:rgba(10,15,30,0.6); padding:6px 14px; border-radius:20px; backdrop-filter:blur(6px); }
+  .hint { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:5; font-size:0.75rem; color:#6e7681; background:rgba(10,15,30,0.6); padding:6px 14px; border-radius:20px; backdrop-filter:blur(6px); text-align:center; }
+  #galaxy-count { position:absolute; bottom:14px; right:18px; z-index:5; font-size:0.75rem; color:#6e7681; background:rgba(10,15,30,0.6); padding:6px 12px; border-radius:20px; backdrop-filter:blur(6px); }
   a { color: var(--accent); }
   .saved-note { margin-top:12px; padding:10px; border-radius:8px; background:rgba(63,185,80,0.08); border:1px solid rgba(63,185,80,0.3); font-size:0.85rem; white-space:pre-wrap; display:none; }
 </style>
@@ -103,7 +105,7 @@
   <!-- Control panel -->
   <div id="ui-panel">
     <h2>✦ Constellation Explorer</h2>
-    <p class="muted" style="margin:4px 0 8px;">Pick any topic — IT, healthcare, security, anything. AI maps it into a star map you can explore, expand, and annotate.</p>
+    <p class="muted" style="margin:4px 0 8px;">Map any topic into a galaxy of stars. Each new topic becomes its own galaxy — zoom out to see them all, zoom in to explore one.</p>
 
     <label>Gemini API key (free — <a href="https://aistudio.google.com/apikey" target="_blank">get one here</a>)</label>
     <input type="password" id="api-key" placeholder="AIza..." />
@@ -117,9 +119,12 @@
     </select>
 
     <label>What do you want to learn?</label>
-    <input type="text" id="topic-input" placeholder="e.g. HTTP authentication, sepsis pathophysiology..." />
+    <input type="text" id="topic-input" placeholder="e.g. GET /login, sepsis pathophysiology..." />
 
-    <button onclick="generateGraph()">→ Map Concept</button>
+    <button onclick="generateGraph()">→ Map Concept (new galaxy)</button>
+    <div class="btn-row">
+      <button class="ghost" onclick="fitAll()">⊙ See all galaxies</button>
+    </div>
     <div class="btn-row">
       <button class="ghost" onclick="saveConstellation()">↓ Save file</button>
       <button class="ghost" onclick="loadConstellation()">↑ Load</button>
@@ -127,6 +132,9 @@
     <div class="btn-row">
       <button class="ghost" onclick="shareConstellation()">⇗ Share</button>
       <button class="ghost danger" onclick="startOver()">✕ New</button>
+    </div>
+    <div class="btn-row" id="undo-row" style="display:none;">
+      <button class="ghost" onclick="recoverLastDeleted()">↺ Recover last deleted galaxy</button>
     </div>
     <div id="loading">Mapping it out, hang on…</div>
     <div id="err"></div>
@@ -137,6 +145,7 @@
   <div id="info-panel">
     <span class="badge" id="info-group">node</span>
     <h2 id="info-title">Concept Node</h2>
+    <p class="muted" id="info-galaxy" style="margin:-2px 0 8px;"></p>
     <p id="info-desc" style="font-size:0.92rem; line-height:1.6; color:#adbac7;"></p>
 
     <div class="saved-note" id="saved-note"></div>
@@ -146,11 +155,13 @@
     <button class="ghost" onclick="saveNote()">Save note</button>
 
     <button onclick="expandNode()">＋ Expand this node (dig deeper)</button>
+    <button class="ghost danger" onclick="deleteCurrentGalaxy()">✕ Delete this galaxy</button>
     <button class="ghost" onclick="closeInfo()">Close</button>
   </div>
 
   <div id="graph-container"></div>
-  <div class="hint">Click a star = details &nbsp;•&nbsp; Drag = move &nbsp;•&nbsp; Scroll = zoom &nbsp;•&nbsp; Double-click a star = expand</div>
+  <div class="hint">Click a star = details &nbsp;•&nbsp; Double-click = expand &nbsp;•&nbsp; Scroll = zoom &nbsp;•&nbsp; Zoom out to see all galaxies &nbsp;•&nbsp; Click a galaxy's name = rename / delete it</div>
+  <div id="galaxy-count"></div>
 
 <script>
 /* ---------------- Background stars ---------------- */
@@ -166,9 +177,14 @@
 })();
 
 /* ---------------- State ---------------- */
-let simulation, svg, g, link, node, labels;
-let graphData = { nodes: [], links: [] };
+/* The universe is an array of galaxies. Each galaxy = one topic/graph. */
+let galaxies = [];          // {seq, topic, center:{x,y}, nodes:[], links:[], central}
+let galaxySeq = 0;          // stable, ever-increasing id so deleting one never reshuffles the others
+let allNodes = [], allLinks = [];
+let lastDeleted = null;     // single-level undo: snapshot of the most recently deleted galaxy
+let simulation, svg, g, link, node, labels, titles;
 let selectedNode = null;
+let currentK = 1;           // current zoom scale
 const width = window.innerWidth, height = window.innerHeight;
 
 /* ---------------- SVG setup ---------------- */
@@ -180,8 +196,12 @@ const feMerge = filter.append("feMerge");
 feMerge.append("feMergeNode").attr("in","coloredBlur");
 feMerge.append("feMergeNode").attr("in","SourceGraphic");
 g = svg.append("g");
-const zoom = d3.zoom().scaleExtent([0.15,4]).on("zoom", e => g.attr("transform", e.transform));
-svg.call(zoom);
+const zoom = d3.zoom().scaleExtent([0.04,4]).on("zoom", e => {
+  g.attr("transform", e.transform);
+  currentK = e.transform.k;
+  applyLOD();
+});
+svg.call(zoom).on("dblclick.zoom", null);   // keep dbl-click for "expand", not zoom
 
 /* ---------------- Helpers ---------------- */
 function showErr(msg){ const e=document.getElementById('err'); e.style.display='block'; e.innerHTML=msg; hideOk(); }
@@ -193,6 +213,12 @@ function setLoading(on){
   el.style.display = on ? 'block' : 'none';
   if (on) el.innerText = 'Mapping it out, hang on…';
 }
+function updateCount(){
+  const el = document.getElementById('galaxy-count');
+  if (!galaxies.length){ el.innerText=''; return; }
+  const n = allNodes.length;
+  el.innerText = galaxies.length + (galaxies.length===1?' galaxy':' galaxies') + ' · ' + n + ' stars';
+}
 
 function colorFor(group){
   if (group === 1) return "#79c0ff";   // central
@@ -200,6 +226,15 @@ function colorFor(group){
   return "#a371f7";                    // deeper / expanded
 }
 function radiusFor(group){ return group === 1 ? 18 : group === 2 ? 10 : 7; }
+
+/* where each new galaxy gets placed (golden-angle spiral so they spread out nicely) */
+function galaxyCenter(i){
+  if (i === 0) return { x: width/2, y: height/2 };
+  const golden = 2.399963229728653;
+  const r = 560 * Math.sqrt(i + 0.6);
+  const a = i * golden;
+  return { x: width/2 + r*Math.cos(a), y: height/2 + r*Math.sin(a) };
+}
 
 /* ---------------- Gemini call ---------------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -228,7 +263,6 @@ async function callGemini(prompt){
         body
       });
     } catch(networkErr){
-      // network dropped — retry
       lastErr = "NETWORK";
       if (attempt < maxAttempts){ setRetryMsg(attempt, maxAttempts); await sleep(800 * 2**(attempt-1)); continue; }
       throw new Error("NETWORK");
@@ -243,16 +277,14 @@ async function callGemini(prompt){
     }
 
     const t = await res.text();
-    // permanent errors — no point retrying
     if (res.status === 400 && /API key not valid/i.test(t)) throw new Error("BAD_KEY");
     if (res.status === 404) throw new Error("BAD_MODEL");
 
-    // transient errors — retry with backoff
     if (res.status === 503 || res.status === 500 || res.status === 429){
       lastErr = res.status === 429 ? "RATE_LIMIT" : "OVERLOADED";
       if (attempt < maxAttempts){
         setRetryMsg(attempt, maxAttempts);
-        await sleep(1200 * 2**(attempt-1));   // 1.2s, 2.4s, 4.8s
+        await sleep(1200 * 2**(attempt-1));
         continue;
       }
       throw new Error(lastErr);
@@ -284,7 +316,33 @@ function explainError(err){
   }
 }
 
-/* ---------------- Generate main graph ---------------- */
+/* ---------------- Build a galaxy from AI data ---------------- */
+function addGalaxy(data, topic){
+  const seq = galaxySeq++;
+  const center = galaxyCenter(galaxies.length);
+  const gx = { seq, topic: topic || data.topic || ("Topic " + (galaxies.length+1)), center, nodes: [], links: [], central: null };
+  const idMap = new Map();
+  (data.nodes||[]).forEach(n => {
+    const nd = { ...n, uid: seq + "::" + n.id, g: gx,
+      x: center.x + (Math.random()-0.5)*140,
+      y: center.y + (Math.random()-0.5)*140 };
+    idMap.set(n.id, nd);
+    gx.nodes.push(nd);
+    if (nd.group === 1 && !gx.central) gx.central = nd;
+  });
+  if (!gx.central && gx.nodes.length) gx.central = gx.nodes[0];
+  (data.links||[]).forEach(l => {
+    const s = typeof l.source==='object'?l.source.id:l.source;
+    const t = typeof l.target==='object'?l.target.id:l.target;
+    if (idMap.has(s) && idMap.has(t)) gx.links.push({ source: idMap.get(s).uid, target: idMap.get(t).uid });
+  });
+  galaxies.push(gx);
+  mergeNotes();
+  rebuild();
+  focusGalaxy(gx);
+}
+
+/* ---------------- Generate main graph (adds a NEW galaxy) ---------------- */
 async function generateGraph(){
   const topic = document.getElementById('topic-input').value.trim();
   hideErr();
@@ -317,25 +375,26 @@ Every id must be unique. Every link source/target must match an existing node id
   try {
     const data = await callGemini(prompt);
     if (!data.nodes || !data.links) throw new Error("Bad shape");
-    graphData = data;
-    mergeNotes();
-    renderGraph();
+    addGalaxy(data, topic);
     autoSave();
+    document.getElementById('topic-input').value = "";
+    showOk(`Added <b>"${topic}"</b> as a new galaxy. Type another topic to add more — or hit <b>See all galaxies</b> to view your whole universe.`);
   } catch(err){
     console.error(err);
     showErr(explainError(err));
-    document.getElementById('ui-panel').classList.remove('shifted');
+    if (!galaxies.length) document.getElementById('ui-panel').classList.remove('shifted');
   } finally {
     setLoading(false);
   }
 }
 
-/* ---------------- Expand a node ---------------- */
+/* ---------------- Expand a node (adds children to its galaxy) ---------------- */
 async function expandNode(){
   if (!selectedNode) return;
   hideErr();
   setLoading(true);
   const parent = selectedNode;
+  const gx = parent.g;
   const prompt = `Within the broader subject, dig deeper into ONLY this specific concept: "${parent.id}".
 Context/description: "${parent.description || ''}".
 Generate 4-7 NEW granular child concepts (sub-parameters, edge cases, related mechanisms) that branch off it.
@@ -347,15 +406,23 @@ Return ONLY valid JSON (no markdown):
 }`;
   try {
     const data = await callGemini(prompt);
-    const existing = new Set(graphData.nodes.map(n => n.id));
-    (data.nodes||[]).forEach(n => { if(!existing.has(n.id)){ graphData.nodes.push(n); existing.add(n.id); }});
+    const existing = new Set(gx.nodes.map(n => n.id));
+    const idMap = new Map(gx.nodes.map(n => [n.id, n]));
+    (data.nodes||[]).forEach(n => {
+      if (!existing.has(n.id)){
+        const nd = { ...n, uid: gx.seq + "::" + n.id, g: gx,
+          x: parent.x + (Math.random()-0.5)*70,
+          y: parent.y + (Math.random()-0.5)*70 };
+        gx.nodes.push(nd); existing.add(n.id); idMap.set(n.id, nd);
+      }
+    });
     (data.links||[]).forEach(l => {
       const s = typeof l.source==='object'?l.source.id:l.source;
       const t = typeof l.target==='object'?l.target.id:l.target;
-      if (existing.has(s) && existing.has(t)) graphData.links.push({source:s, target:t});
+      if (idMap.has(s) && idMap.has(t)) gx.links.push({ source: idMap.get(s).uid, target: idMap.get(t).uid });
     });
     mergeNotes();
-    renderGraph();
+    rebuild();
     autoSave();
   } catch(err){
     console.error(err);
@@ -365,40 +432,193 @@ Return ONLY valid JSON (no markdown):
   }
 }
 
-/* ---------------- Render ---------------- */
-function renderGraph(){
-  g.selectAll("*").remove();
+/* ---------------- Render everything (all galaxies together) ---------------- */
+function rebuild(){
+  allNodes = []; allLinks = [];
+  galaxies.forEach(gx => { gx.nodes.forEach(n => allNodes.push(n)); gx.links.forEach(l => allLinks.push(l)); });
+  render();
+  updateCount();
+}
 
-  simulation = d3.forceSimulation(graphData.nodes)
-    .force("link", d3.forceLink(graphData.links).id(d=>d.id).distance(d=> (d.target.group===3?90:150)))
-    .force("charge", d3.forceManyBody().strength(-420))
-    .force("center", d3.forceCenter(width/2, height/2))
-    .force("collide", d3.forceCollide().radius(d=>radiusFor(d.group)+18));
+function render(){
+  // links
+  link = g.selectAll("line.lnk").data(allLinks, d => (d.source.uid||d.source) + ">" + (d.target.uid||d.target));
+  link.exit().remove();
+  link = link.enter().append("line").attr("class","lnk")
+      .attr("stroke","#444d56").attr("stroke-opacity",0.4).attr("stroke-width",1.3)
+    .merge(link);
 
-  link = g.append("g").attr("class","links").selectAll("line")
-    .data(graphData.links).enter().append("line");
+  // nodes
+  node = g.selectAll("circle.nd").data(allNodes, d => d.uid);
+  node.exit().remove();
+  node = node.enter().append("circle").attr("class","nd")
+      .attr("filter","url(#glow)")
+      .on("click", showInfo)
+      .on("dblclick", (e,d)=>{ e.stopPropagation(); selectedNode=d; expandNode(); })
+      .call(drag())
+    .merge(node)
+      .attr("r", d=>radiusFor(d.group))
+      .attr("fill", d=>colorFor(d.group));
 
-  node = g.append("g").attr("class","nodes").selectAll("circle")
-    .data(graphData.nodes).enter().append("circle")
-    .attr("r", d=>radiusFor(d.group))
-    .attr("fill", d=>colorFor(d.group))
-    .attr("filter","url(#glow)")
-    .style("opacity", d=> d.group===1?1:0.9)
-    .call(drag(simulation))
-    .on("click", showInfo)
-    .on("dblclick", (e,d)=>{ selectedNode=d; expandNode(); });
+  // node labels
+  labels = g.selectAll("text.node-label").data(allNodes, d => d.uid);
+  labels.exit().remove();
+  labels = labels.enter().append("text").attr("class","node-label").attr("dy",4)
+    .merge(labels)
+      .text(d=>d.id).attr("dx", d=>radiusFor(d.group)+6);
 
-  labels = g.append("g").selectAll("text")
-    .data(graphData.nodes).enter().append("text")
-    .attr("class","node-label").text(d=>d.id)
-    .attr("dx", d=>radiusFor(d.group)+6).attr("dy",4);
+  // galaxy titles (click a title to manage / delete that galaxy)
+  titles = g.selectAll("text.galaxy-title").data(galaxies, d => d.seq);
+  titles.exit().remove();
+  titles = titles.enter().append("text").attr("class","galaxy-title")
+      .style("pointer-events","auto").style("cursor","pointer")
+      .on("click", (e,d)=>{ e.stopPropagation(); openGalaxyMenu(d); })
+    .merge(titles)
+      .text(d=>d.topic);
+
+  simulation = d3.forceSimulation(allNodes)
+    .force("link", d3.forceLink(allLinks).id(d=>d.uid).distance(d=> (d.target.group===3?80:130)).strength(0.5))
+    .force("charge", d3.forceManyBody().strength(-260))
+    .force("x", d3.forceX(d=>d.g.center.x).strength(0.13))
+    .force("y", d3.forceY(d=>d.g.center.y).strength(0.13))
+    .force("collide", d3.forceCollide().radius(d=>radiusFor(d.group)+14))
+    .alpha(0.9).restart();
 
   simulation.on("tick", ()=>{
     link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y)
         .attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
     node.attr("cx",d=>d.x).attr("cy",d=>d.y);
     labels.attr("x",d=>d.x).attr("y",d=>d.y);
+    titles.attr("x", d=> d.central ? d.central.x : d.center.x)
+          .attr("y", d=> (d.central ? d.central.y : d.center.y) - 30);
   });
+
+  applyLOD();
+}
+
+/* ---------------- Level of detail (what shows at each zoom) ---------------- */
+function applyLOD(){
+  const k = currentK;
+  if (labels) labels.style("opacity", k >= 0.7 ? 1 : 0);
+  if (node) node.style("opacity", d => {
+    if (k < 0.35) return d.group===1 ? 1 : (d.group===2 ? 0.45 : 0.1);
+    return d.group===1 ? 1 : 0.9;
+  });
+  if (titles){
+    const show = k < 0.75;
+    titles.style("opacity", show ? 1 : 0)
+          .style("font-size", Math.max(11, 20/Math.max(k,0.05)) + "px");
+  }
+}
+
+/* smoothly fly to one galaxy */
+function focusGalaxy(gx){
+  const k = 0.9;
+  const t = d3.zoomIdentity.translate(width/2 - gx.center.x*k, height/2 - gx.center.y*k).scale(k);
+  svg.transition().duration(700).call(zoom.transform, t);
+}
+
+/* click a galaxy's title -> small menu to focus, rename or delete it */
+function openGalaxyMenu(gx){
+  const choice = prompt(
+    `Galaxy: "${gx.topic}" (${gx.nodes.length} stars)\n\n` +
+    `Type a number:\n` +
+    `  1 = Delete this galaxy\n` +
+    `  2 = Rename this galaxy\n` +
+    `  3 = Focus / zoom into it\n\n` +
+    `(or Cancel)`, "3");
+  if (choice === null) return;
+  const c = choice.trim();
+  if (c === "1") deleteGalaxy(gx);
+  else if (c === "2") renameGalaxy(gx);
+  else if (c === "3") focusGalaxy(gx);
+}
+
+function renameGalaxy(gx){
+  const name = prompt("New name for this galaxy:", gx.topic);
+  if (name === null) return;
+  gx.topic = name.trim() || gx.topic;
+  render(); autoSave();
+}
+
+/* serialize ONE galaxy to a plain (no circular refs) object — used for undo */
+function galaxyToData(gx){
+  return {
+    topic: gx.topic, cx: gx.center.x, cy: gx.center.y,
+    nodes: gx.nodes.map(n => ({ id:n.id, group:n.group, description:n.description, note:n.note||"", x:n.x, y:n.y })),
+    links: gx.links.map(l => ({ source: bareId(l.source), target: bareId(l.target) }))
+  };
+}
+
+function deleteGalaxy(gx){
+  if (!confirm(`Delete the galaxy "${gx.topic}" and all ${gx.nodes.length} of its stars?\n\nYou can undo this once with "Recover last deleted galaxy". (For long-term keeping, use 'Save file'.)`)) return;
+  // stash a copy so we can recover it (replaces any older undo — we keep only the LAST one)
+  lastDeleted = galaxyToData(gx);
+  // drop its saved notes too
+  try {
+    const all = JSON.parse(localStorage.getItem("kc_notes") || "{}");
+    gx.nodes.forEach(n => { delete all[n.uid]; });
+    localStorage.setItem("kc_notes", JSON.stringify(all));
+  } catch(e){}
+  // if the open info panel belonged to this galaxy, close it
+  if (selectedNode && selectedNode.g === gx){ selectedNode = null; closeInfo(); }
+  galaxies = galaxies.filter(x => x !== gx);
+  rebuild();
+  autoSave();
+  updateUndoBtn();
+  if (galaxies.length){ showOk(`Deleted "<b>${gx.topic}</b>". ${galaxies.length} galax${galaxies.length===1?'y':'ies'} left. Changed your mind? Hit <b>Recover last deleted galaxy</b>.`); setTimeout(fitAll, 300); }
+  else { localStorage.removeItem("kc_saved"); showOk(`Deleted "<b>${gx.topic}</b>" — your universe is empty now. Changed your mind? Hit <b>Recover last deleted galaxy</b>.`); }
+}
+
+function recoverLastDeleted(){
+  if (!lastDeleted){ showErr("Nothing to recover — you haven't deleted a galaxy this session."); return; }
+  const gd = lastDeleted;
+  const seq = galaxySeq++;
+  const center = (gd.cx != null) ? { x: gd.cx, y: gd.cy } : galaxyCenter(galaxies.length);
+  const gx = { seq, topic: gd.topic, center, nodes: [], links: [], central: null };
+  const idMap = new Map();
+  (gd.nodes||[]).forEach(n => {
+    const nd = { ...n, uid: seq + "::" + n.id, g: gx,
+      x: (n.x != null ? n.x : center.x + (Math.random()-0.5)*140),
+      y: (n.y != null ? n.y : center.y + (Math.random()-0.5)*140) };
+    idMap.set(n.id, nd); gx.nodes.push(nd);
+    if (nd.group === 1 && !gx.central) gx.central = nd;
+  });
+  if (!gx.central && gx.nodes.length) gx.central = gx.nodes[0];
+  (gd.links||[]).forEach(l => {
+    if (idMap.has(l.source) && idMap.has(l.target)) gx.links.push({ source: idMap.get(l.source).uid, target: idMap.get(l.target).uid });
+  });
+  // restore its notes into localStorage too
+  try {
+    const all = JSON.parse(localStorage.getItem("kc_notes") || "{}");
+    gx.nodes.forEach(n => { if (n.note) all[n.uid] = n.note; });
+    localStorage.setItem("kc_notes", JSON.stringify(all));
+  } catch(e){}
+  galaxies.push(gx);
+  lastDeleted = null;          // only the last one is recoverable, and only once
+  rebuild();
+  autoSave();
+  updateUndoBtn();
+  showOk(`Recovered "<b>${gx.topic}</b>".`);
+  focusGalaxy(gx);
+}
+
+function updateUndoBtn(){
+  document.getElementById('undo-row').style.display = lastDeleted ? 'flex' : 'none';
+}
+
+/* zoom out to fit every galaxy on screen */
+function fitAll(){
+  if (!galaxies.length){ showErr("No galaxies yet — map a topic first."); return; }
+  hideErr();
+  const xs = galaxies.map(g=>g.center.x), ys = galaxies.map(g=>g.center.y);
+  const minX=Math.min(...xs)-450, maxX=Math.max(...xs)+450;
+  const minY=Math.min(...ys)-450, maxY=Math.max(...ys)+450;
+  const w=maxX-minX, h=maxY-minY;
+  const k=Math.max(0.04, Math.min(1.2, 0.9*Math.min(width/w, height/h)));
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const t=d3.zoomIdentity.translate(width/2 - cx*k, height/2 - cy*k).scale(k);
+  svg.transition().duration(750).call(zoom.transform, t);
 }
 
 /* ---------------- Info panel + notes ---------------- */
@@ -406,6 +626,7 @@ function showInfo(event, d){
   selectedNode = d;
   document.getElementById("info-group").innerText = d.group===1?"central":d.group===2?"major":"detail";
   document.getElementById("info-title").innerText = d.id;
+  document.getElementById("info-galaxy").innerText = "in galaxy: " + (d.g ? d.g.topic : "");
   document.getElementById("info-desc").innerText = d.description || "(no description)";
   const noteBox = document.getElementById("note-input");
   noteBox.value = d.note || "";
@@ -414,144 +635,171 @@ function showInfo(event, d){
   document.getElementById("info-panel").style.display = "block";
 }
 function closeInfo(){ document.getElementById("info-panel").style.display="none"; }
+function deleteCurrentGalaxy(){ if (selectedNode && selectedNode.g) deleteGalaxy(selectedNode.g); }
 
 function saveNote(){
   if (!selectedNode) return;
   selectedNode.note = document.getElementById("note-input").value;
-  // persist notes by id
-  const key = "kc_notes";
-  const all = JSON.parse(localStorage.getItem(key) || "{}");
-  all[selectedNode.id] = selectedNode.note;
-  localStorage.setItem(key, JSON.stringify(all));
+  const all = JSON.parse(localStorage.getItem("kc_notes") || "{}");
+  all[selectedNode.uid] = selectedNode.note;
+  localStorage.setItem("kc_notes", JSON.stringify(all));
   const saved = document.getElementById("saved-note");
   if (selectedNode.note){ saved.style.display='block'; saved.innerText="Saved note:\n"+selectedNode.note; }
   else { saved.style.display='none'; }
+  autoSave();
 }
 function mergeNotes(){
   const all = JSON.parse(localStorage.getItem("kc_notes") || "{}");
-  graphData.nodes.forEach(n => { if (all[n.id]) n.note = all[n.id]; });
+  galaxies.forEach(gx => gx.nodes.forEach(n => { if (all[n.uid]) n.note = all[n.uid]; }));
 }
 
-/* ---------------- Save / load whole constellation ---------------- */
+/* ---------------- Snapshot / save / load (whole universe) ---------------- */
+function bareId(v){ return (v && v.id !== undefined) ? v.id : String(v).split("::").slice(1).join("::"); }
 function snapshot(){
   return {
-    nodes: graphData.nodes.map(n=>({id:n.id, group:n.group, description:n.description, note:n.note||""})),
-    links: graphData.links.map(l=>({source: l.source.id||l.source, target: l.target.id||l.target})),
-    topic: document.getElementById('topic-input').value
+    version: 2,
+    galaxies: galaxies.map(gx => ({
+      topic: gx.topic, cx: gx.center.x, cy: gx.center.y,
+      nodes: gx.nodes.map(n => ({ id:n.id, group:n.group, description:n.description, note:n.note||"", x:n.x, y:n.y })),
+      links: gx.links.map(l => ({ source: bareId(l.source), target: bareId(l.target) }))
+    }))
   };
 }
-/* called automatically after every map/expand so Load always has the latest */
+function loadSnapshot(snap){
+  galaxies = []; galaxySeq = 0;
+  // support both the new {galaxies:[...]} and the old single {nodes,links,topic}
+  const arr = snap.galaxies ? snap.galaxies : [{ topic: snap.topic, nodes: snap.nodes, links: snap.links }];
+  arr.forEach((gd, i) => {
+    const seq = galaxySeq++;
+    const center = (gd.cx != null) ? { x: gd.cx, y: gd.cy } : galaxyCenter(i);
+    const gx = { seq, topic: gd.topic || ("Topic " + (i+1)), center, nodes: [], links: [], central: null };
+    const idMap = new Map();
+    (gd.nodes||[]).forEach(n => {
+      const nd = { ...n, uid: seq + "::" + n.id, g: gx,
+        x: (n.x != null ? n.x : center.x + (Math.random()-0.5)*140),
+        y: (n.y != null ? n.y : center.y + (Math.random()-0.5)*140) };
+      idMap.set(n.id, nd); gx.nodes.push(nd);
+      if (nd.group === 1 && !gx.central) gx.central = nd;
+    });
+    if (!gx.central && gx.nodes.length) gx.central = gx.nodes[0];
+    (gd.links||[]).forEach(l => {
+      const s = typeof l.source==='object'?l.source.id:l.source;
+      const t = typeof l.target==='object'?l.target.id:l.target;
+      if (idMap.has(s) && idMap.has(t)) gx.links.push({ source: idMap.get(s).uid, target: idMap.get(t).uid });
+    });
+    galaxies.push(gx);
+  });
+  mergeNotes();
+  rebuild();
+}
+
 function autoSave(){
-  if (!graphData.nodes.length) return;
+  if (!galaxies.length) return;
   try { localStorage.setItem("kc_saved", JSON.stringify(snapshot())); } catch(e){}
 }
 function saveConstellation(){
-  if (!graphData.nodes.length){ showErr("Nothing to save yet — map a concept first."); return; }
+  if (!galaxies.length){ showErr("Nothing to save yet — map a topic first."); return; }
   const slim = snapshot();
   localStorage.setItem("kc_saved", JSON.stringify(slim));
-  // also download a file
   const blob = new Blob([JSON.stringify(slim,null,2)], {type:"application/json"});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = (slim.topic||"constellation").replace(/\s+/g,'_') + ".json";
+  const name = (galaxies.length===1 ? galaxies[0].topic : "my_universe").replace(/\s+/g,'_');
+  a.download = name + ".json";
   a.click();
-  hideErr();
+  showOk("Saved a <b>.json file</b> to your downloads — keep it anywhere (Desktop, Drive, USB). Reopen it later by dragging it onto this page.");
 }
 function loadConstellation(){
   const raw = localStorage.getItem("kc_saved");
-  if (!raw){ showErr("Nothing to load yet — map a concept first (it saves automatically), or drag a saved .json file onto the page."); return; }
-  graphData = JSON.parse(raw);
-  document.getElementById('topic-input').value = graphData.topic || "";
+  if (!raw){ showErr("Nothing to load yet — map a topic first (it saves automatically), or drag a saved .json file onto the page."); return; }
+  loadSnapshot(JSON.parse(raw));
   document.getElementById('ui-panel').classList.add('shifted');
-  mergeNotes();
-  renderGraph();
   hideErr();
+  setTimeout(fitAll, 400);
 }
 
 /* ---------------- Share ---------------- */
 function shareConstellation(){
-  if (!graphData.nodes.length){ showErr("Map a concept first, then you can share it."); return; }
+  if (!galaxies.length){ showErr("Map a topic first, then you can share it."); return; }
   const json = JSON.stringify(snapshot());
-  // compress into a URL-safe string
   let encoded;
-  try { encoded = btoa(unescape(encodeURIComponent(json))); }
-  catch(e){ encoded = ""; }
+  try { encoded = btoa(unescape(encodeURIComponent(json))); } catch(e){ encoded = ""; }
   const base = location.href.split('#')[0].split('?')[0];
-  const link = base + "#p=" + encoded;
+  const linkUrl = base + "#p=" + encoded;
 
-  // Browsers/chat apps choke on very long URLs (~8000 chars is a safe ceiling).
-  if (encoded && link.length < 8000){
-    const safeLink = link.replace(/"/g,'&quot;');
+  if (encoded && linkUrl.length < 8000){
+    const safe = linkUrl.replace(/"/g,'&quot;');
     showOk(
       "Share link ready — copy it and paste in your class group / chat:" +
-      "<input class='sharebox' readonly onclick='this.select()' value=\"" + safeLink + "\">" +
+      "<input class='sharebox' readonly onclick='this.select()' value=\"" + safe + "\">" +
       "<button class='ghost' style='margin-top:8px' onclick='copyShareLink(this)'>Copy link</button>"
     );
-    window._lastShareLink = link;
+    window._lastShareLink = linkUrl;
   } else {
-    // too big for a link — fall back to the file
     saveConstellation();
-    showOk("This project is big, so a link won't fit. I've downloaded a <b>.json file</b> instead — share that file (email / class drive / chat attachment). Anyone can open it by dragging it onto this page.");
+    showOk("This universe is big, so a link won't fit. I've downloaded a <b>.json file</b> instead — share that file (email / class drive / chat). Anyone can open it by dragging it onto this page.");
   }
 }
 function copyShareLink(btn){
-  const link = window._lastShareLink || "";
-  navigator.clipboard?.writeText(link).then(
+  const linkUrl = window._lastShareLink || "";
+  navigator.clipboard?.writeText(linkUrl).then(
     ()=>{ btn.innerText = "Copied ✓"; setTimeout(()=>btn.innerText="Copy link",1500); },
     ()=>{ btn.innerText = "Press Ctrl/Cmd+C"; }
   );
 }
-
-/* load a shared project from the URL hash, if present */
 function loadFromHash(){
   const h = location.hash;
   if (!h.startsWith("#p=")) return false;
   try {
     const json = decodeURIComponent(escape(atob(h.slice(3))));
-    graphData = JSON.parse(json);
-    document.getElementById('topic-input').value = graphData.topic || "";
+    loadSnapshot(JSON.parse(json));
     document.getElementById('ui-panel').classList.add('shifted');
-    mergeNotes();
-    renderGraph();
-    showOk("Opened a shared constellation. Add your own notes, expand nodes, or hit <b>New</b> to start fresh.");
+    showOk("Opened a shared universe. Add your own notes, expand nodes, or hit <b>New</b> to start fresh.");
+    setTimeout(fitAll, 400);
     return true;
   } catch(e){ return false; }
 }
 
 /* ---------------- Start over ---------------- */
 function startOver(){
-  if (graphData.nodes.length && !confirm("Start a brand-new project? Your current map on screen will be cleared.\n\n(Tip: use 'Save file' first if you want to keep it.)")) return;
-  graphData = { nodes: [], links: [] };
+  if (galaxies.length && !confirm("Start a brand-new universe? Everything on screen will be cleared.\n\n(Tip: use 'Save file' first if you want to keep it.)")) return;
+  galaxies = []; galaxySeq = 0; allNodes = []; allLinks = [];
+  lastDeleted = null; updateUndoBtn();
   selectedNode = null;
+  if (simulation) simulation.stop();
   g.selectAll("*").remove();
   closeInfo();
   document.getElementById('topic-input').value = "";
   document.getElementById('ui-panel').classList.remove('shifted');
   localStorage.removeItem("kc_saved");
   if (location.hash) history.replaceState(null,"",location.pathname);
+  svg.call(zoom.transform, d3.zoomIdentity);
+  currentK = 1;
+  updateCount();
   hideErr();
   showWelcome();
 }
 
 /* ---------------- Welcome ---------------- */
 function showWelcome(){
-  showOk("Welcome — this is your first project. Type a topic above and hit <b>Map Concept</b> to begin. Everything you build saves automatically.");
+  showOk("Welcome — your universe is empty. Type a topic above and hit <b>Map Concept</b> to create your first galaxy. Add as many topics as you like; each becomes its own galaxy.");
 }
+
 /* drag & drop a saved .json file onto the page to import */
 window.addEventListener('dragover', e=>e.preventDefault());
 window.addEventListener('drop', e=>{
   e.preventDefault();
   const f = e.dataTransfer.files[0]; if(!f) return;
   const r = new FileReader();
-  r.onload = ()=>{ try{ graphData = JSON.parse(r.result); document.getElementById('ui-panel').classList.add('shifted'); mergeNotes(); renderGraph(); hideErr(); }catch{ showErr("That file wasn't a valid constellation JSON."); } };
+  r.onload = ()=>{ try{ loadSnapshot(JSON.parse(r.result)); document.getElementById('ui-panel').classList.add('shifted'); hideErr(); setTimeout(fitAll,400);}catch{ showErr("That file wasn't a valid constellation JSON."); } };
   r.readAsText(f);
 });
 
-/* ---------------- Drag behaviour ---------------- */
-function drag(sim){
-  function started(e,d){ if(!e.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; }
+/* ---------------- Drag behaviour (individual stars) ---------------- */
+function drag(){
+  function started(e,d){ if(!e.active) simulation.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; }
   function dragged(e,d){ d.fx=e.x; d.fy=e.y; }
-  function ended(e,d){ if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }
+  function ended(e,d){ if(!e.active) simulation.alphaTarget(0); d.fx=null; d.fy=null; }
   return d3.drag().on("start",started).on("drag",dragged).on("end",ended);
 }
 
@@ -563,14 +811,16 @@ document.getElementById('topic-input').addEventListener('keydown', e=>{ if(e.key
 
 /* ---------------- Startup ---------------- */
 (function init(){
-  // 1) someone opened a shared link?
-  if (loadFromHash()) return;
-  // 2) first-ever visit? show a friendly welcome instead of any error
-  if (!localStorage.getItem('kc_seen')){
-    localStorage.setItem('kc_seen','1');
-    showWelcome();
+  if (loadFromHash()) return;            // opened a shared link
+  const raw = localStorage.getItem("kc_saved");
+  if (raw){                              // bring back the last universe
+    try { loadSnapshot(JSON.parse(raw)); document.getElementById('ui-panel').classList.add('shifted'); setTimeout(fitAll,500); return; } catch(e){}
   }
+  if (!localStorage.getItem('kc_seen')){ // first-ever visit
+    localStorage.setItem('kc_seen','1');
+  }
+  showWelcome();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0dbf8c99ec9c0f6',t:'MTc4MTgwMzMwMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0dc19e8eff1ac54',t:'MTc4MTgwNDY1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
