@@ -76,6 +76,8 @@
   button:hover { background: linear-gradient(135deg, #388bfd 0%, #1f6feb 100%); box-shadow: 0 4px 18px rgba(56,139,253,0.5); transform: translateY(-1px); }
   button.ghost { background: #21262d; box-shadow: none; }
   button.ghost:hover { background: #2d333b; transform: none; box-shadow: none; }
+  button.ghost.danger { color: #ff7b72; }
+  button.ghost.danger:hover { background: rgba(248,81,73,0.15); }
   .btn-row { display: flex; gap: 8px; }
   .btn-row button { margin-top: 10px; }
 
@@ -87,6 +89,8 @@
 
   #loading { display: none; color: #8b949e; margin-top: 12px; font-size: 0.85rem; text-align: center; font-style: italic; }
   #err { display:none; margin-top:10px; padding:10px; border-radius:8px; background:rgba(248,81,73,0.12); border:1px solid rgba(248,81,73,0.4); color:#ff7b72; font-size:0.8rem; }
+  #ok { display:none; margin-top:10px; padding:10px; border-radius:8px; background:rgba(63,185,80,0.12); border:1px solid rgba(63,185,80,0.4); color:#56d364; font-size:0.8rem; }
+  #ok .sharebox { width:100%; margin-top:8px; padding:8px; font-size:0.75rem; background:rgba(1,4,9,0.6); border:1px solid var(--line); color:#adbac7; border-radius:6px; word-break:break-all; }
   .badge { display:inline-block; font-size:0.7rem; padding:2px 8px; border-radius:20px; background:rgba(88,166,255,0.15); color:var(--accent); margin-bottom:8px; }
   .hint { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:5; font-size:0.75rem; color:#6e7681; background:rgba(10,15,30,0.6); padding:6px 14px; border-radius:20px; backdrop-filter:blur(6px); }
   a { color: var(--accent); }
@@ -117,11 +121,16 @@
 
     <button onclick="generateGraph()">→ Map Concept</button>
     <div class="btn-row">
-      <button class="ghost" onclick="saveConstellation()">↓ Save</button>
+      <button class="ghost" onclick="saveConstellation()">↓ Save file</button>
       <button class="ghost" onclick="loadConstellation()">↑ Load</button>
+    </div>
+    <div class="btn-row">
+      <button class="ghost" onclick="shareConstellation()">⇗ Share</button>
+      <button class="ghost danger" onclick="startOver()">✕ New</button>
     </div>
     <div id="loading">Mapping it out, hang on…</div>
     <div id="err"></div>
+    <div id="ok"></div>
   </div>
 
   <!-- Info panel -->
@@ -175,8 +184,10 @@ const zoom = d3.zoom().scaleExtent([0.15,4]).on("zoom", e => g.attr("transform",
 svg.call(zoom);
 
 /* ---------------- Helpers ---------------- */
-function showErr(msg){ const e=document.getElementById('err'); e.style.display='block'; e.innerHTML=msg; }
+function showErr(msg){ const e=document.getElementById('err'); e.style.display='block'; e.innerHTML=msg; hideOk(); }
 function hideErr(){ document.getElementById('err').style.display='none'; }
+function showOk(msg){ const e=document.getElementById('ok'); e.style.display='block'; e.innerHTML=msg; hideErr(); }
+function hideOk(){ document.getElementById('ok').style.display='none'; }
 function setLoading(on){
   const el = document.getElementById('loading');
   el.style.display = on ? 'block' : 'none';
@@ -309,6 +320,7 @@ Every id must be unique. Every link source/target must match an existing node id
     graphData = data;
     mergeNotes();
     renderGraph();
+    autoSave();
   } catch(err){
     console.error(err);
     showErr(explainError(err));
@@ -344,6 +356,7 @@ Return ONLY valid JSON (no markdown):
     });
     mergeNotes();
     renderGraph();
+    autoSave();
   } catch(err){
     console.error(err);
     showErr(explainError(err));
@@ -405,6 +418,7 @@ function closeInfo(){ document.getElementById("info-panel").style.display="none"
 function saveNote(){
   if (!selectedNode) return;
   selectedNode.note = document.getElementById("note-input").value;
+  // persist notes by id
   const key = "kc_notes";
   const all = JSON.parse(localStorage.getItem(key) || "{}");
   all[selectedNode.id] = selectedNode.note;
@@ -419,14 +433,23 @@ function mergeNotes(){
 }
 
 /* ---------------- Save / load whole constellation ---------------- */
-function saveConstellation(){
-  if (!graphData.nodes.length){ showErr("Nothing to save yet — map a concept first."); return; }
-  const slim = {
+function snapshot(){
+  return {
     nodes: graphData.nodes.map(n=>({id:n.id, group:n.group, description:n.description, note:n.note||""})),
     links: graphData.links.map(l=>({source: l.source.id||l.source, target: l.target.id||l.target})),
     topic: document.getElementById('topic-input').value
   };
+}
+/* called automatically after every map/expand so Load always has the latest */
+function autoSave(){
+  if (!graphData.nodes.length) return;
+  try { localStorage.setItem("kc_saved", JSON.stringify(snapshot())); } catch(e){}
+}
+function saveConstellation(){
+  if (!graphData.nodes.length){ showErr("Nothing to save yet — map a concept first."); return; }
+  const slim = snapshot();
   localStorage.setItem("kc_saved", JSON.stringify(slim));
+  // also download a file
   const blob = new Blob([JSON.stringify(slim,null,2)], {type:"application/json"});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -436,13 +459,83 @@ function saveConstellation(){
 }
 function loadConstellation(){
   const raw = localStorage.getItem("kc_saved");
-  if (!raw){ showErr("No saved constellation in this browser. (Use Save first, or import a .json by drag-drop.)"); return; }
+  if (!raw){ showErr("Nothing to load yet — map a concept first (it saves automatically), or drag a saved .json file onto the page."); return; }
   graphData = JSON.parse(raw);
   document.getElementById('topic-input').value = graphData.topic || "";
   document.getElementById('ui-panel').classList.add('shifted');
   mergeNotes();
   renderGraph();
   hideErr();
+}
+
+/* ---------------- Share ---------------- */
+function shareConstellation(){
+  if (!graphData.nodes.length){ showErr("Map a concept first, then you can share it."); return; }
+  const json = JSON.stringify(snapshot());
+  // compress into a URL-safe string
+  let encoded;
+  try { encoded = btoa(unescape(encodeURIComponent(json))); }
+  catch(e){ encoded = ""; }
+  const base = location.href.split('#')[0].split('?')[0];
+  const link = base + "#p=" + encoded;
+
+  // Browsers/chat apps choke on very long URLs (~8000 chars is a safe ceiling).
+  if (encoded && link.length < 8000){
+    const safeLink = link.replace(/"/g,'&quot;');
+    showOk(
+      "Share link ready — copy it and paste in your class group / chat:" +
+      "<input class='sharebox' readonly onclick='this.select()' value=\"" + safeLink + "\">" +
+      "<button class='ghost' style='margin-top:8px' onclick='copyShareLink(this)'>Copy link</button>"
+    );
+    window._lastShareLink = link;
+  } else {
+    // too big for a link — fall back to the file
+    saveConstellation();
+    showOk("This project is big, so a link won't fit. I've downloaded a <b>.json file</b> instead — share that file (email / class drive / chat attachment). Anyone can open it by dragging it onto this page.");
+  }
+}
+function copyShareLink(btn){
+  const link = window._lastShareLink || "";
+  navigator.clipboard?.writeText(link).then(
+    ()=>{ btn.innerText = "Copied ✓"; setTimeout(()=>btn.innerText="Copy link",1500); },
+    ()=>{ btn.innerText = "Press Ctrl/Cmd+C"; }
+  );
+}
+
+/* load a shared project from the URL hash, if present */
+function loadFromHash(){
+  const h = location.hash;
+  if (!h.startsWith("#p=")) return false;
+  try {
+    const json = decodeURIComponent(escape(atob(h.slice(3))));
+    graphData = JSON.parse(json);
+    document.getElementById('topic-input').value = graphData.topic || "";
+    document.getElementById('ui-panel').classList.add('shifted');
+    mergeNotes();
+    renderGraph();
+    showOk("Opened a shared constellation. Add your own notes, expand nodes, or hit <b>New</b> to start fresh.");
+    return true;
+  } catch(e){ return false; }
+}
+
+/* ---------------- Start over ---------------- */
+function startOver(){
+  if (graphData.nodes.length && !confirm("Start a brand-new project? Your current map on screen will be cleared.\n\n(Tip: use 'Save file' first if you want to keep it.)")) return;
+  graphData = { nodes: [], links: [] };
+  selectedNode = null;
+  g.selectAll("*").remove();
+  closeInfo();
+  document.getElementById('topic-input').value = "";
+  document.getElementById('ui-panel').classList.remove('shifted');
+  localStorage.removeItem("kc_saved");
+  if (location.hash) history.replaceState(null,"",location.pathname);
+  hideErr();
+  showWelcome();
+}
+
+/* ---------------- Welcome ---------------- */
+function showWelcome(){
+  showOk("Welcome — this is your first project. Type a topic above and hit <b>Map Concept</b> to begin. Everything you build saves automatically.");
 }
 /* drag & drop a saved .json file onto the page to import */
 window.addEventListener('dragover', e=>e.preventDefault());
@@ -467,6 +560,17 @@ const keyInput = document.getElementById('api-key');
 keyInput.value = localStorage.getItem('kc_key') || '';
 keyInput.addEventListener('change', ()=>localStorage.setItem('kc_key', keyInput.value.trim()));
 document.getElementById('topic-input').addEventListener('keydown', e=>{ if(e.key==='Enter') generateGraph(); });
+
+/* ---------------- Startup ---------------- */
+(function init(){
+  // 1) someone opened a shared link?
+  if (loadFromHash()) return;
+  // 2) first-ever visit? show a friendly welcome instead of any error
+  if (!localStorage.getItem('kc_seen')){
+    localStorage.setItem('kc_seen','1');
+    showWelcome();
+  }
+})();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0dbf8c99ec9c0f6',t:'MTc4MTgwMzMwMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
