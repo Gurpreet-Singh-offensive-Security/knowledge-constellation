@@ -120,6 +120,31 @@ That's yours for good. Send it to anyone — they open it, paste their own free 
 
 ---
 
+## If you see an error, don't panic
+
+Most "errors" here aren't your fault or the app's — they're just Google's free
+servers having a busy moment. The app already retries automatically before it
+ever shows you anything, so usually you won't even notice. Here's the cheat sheet:
+
+| What it says | What's really going on | What to do |
+|---|---|---|
+| **"Servers are overloaded / high demand" (503)** | Google's side is momentarily slammed. Totally normal, totally temporary. | The app auto-retries a few times. If it still complains, wait a few seconds and hit the button again, or switch model. |
+| **"Sending requests too fast" (429)** | The free tier only allows a handful of requests per minute, and you went over. | Wait ~30 seconds. For heavy expanding, switch to **gemini-2.5-flash-lite** (higher limits). |
+| **"API key was rejected"** | Key got mistyped or copied wrong. | Re-copy it from [Google AI Studio](https://aistudio.google.com/apikey). |
+| **"Model isn't available"** | That model isn't on your key. | Pick **gemini-2.5-flash** from the dropdown. |
+| **"Couldn't reach Google"** | Your internet blinked. | Check your connection and retry. |
+
+> Quick mental model: think of the free API like calling a popular restaurant.
+> Sometimes the line's just busy — you call back in a few seconds and you're in.
+> None of it means anything is broken.
+
+**Going for a giant constellation?** You can expand nodes basically forever, but
+remember the only real speed limit is how fast *one free key* is allowed to call
+Google. Pause a couple seconds between expands (or use the lite model) and you'll
+sail right past the busy-server hiccups.
+
+---
+
 <div align="center">
 
 **Built because freezing up in front of a real system is the worst feeling — and a map beats a wall of text every time.**
