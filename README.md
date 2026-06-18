@@ -1,43 +1,77 @@
-# Knowledge Constellation Explorer
+🌌 Knowledge Constellation Explorer
 
-An AI-powered knowledge graph tool that transforms complex topics into an interactive "galaxy" of interconnected ideas. Built to help engineers, security researchers, and students break down deep concepts (like HTTP request parameters, authentication flows, IT infrastructure, or deep learning architectures) into visual, scannable nodes.
+Turn any topic into an interactive "star map" of connected concepts.
+Big stars = major ideas, small stars = the granular details (parameters, headers,
+mechanisms, edge cases). Click a star to read a plain-language deep explanation,
+add your own notes, or expand it to dig even deeper.
 
----
+Works for IT infrastructure, authentication, security, deep learning, healthcare,
+finance — literally anything. Powered by your own free Google Gemini API key.
 
-##  Features
+ Features
 
-*   **Interactive Node Graph:** Uses D3.js to render a space-like constellation of big conceptual nodes and minor parameter dots.
-*   **AI-Powered Insights:** Integrates with the free Gemini API to instantly generate nodes, connections, and deep explanations for any topic.
-*   **Zoom & Drag Physics:** Pan around massive topic galaxies and drag nodes around to map your thoughts.
-*   **Zero Infrastructure:** A single, lightweight HTML file running entirely in your browser. No databases, no tracking.
-*   **100% Free Lifetime Hosting:** Deployable on GitHub Pages with zero maintenance or server costs.
+    AI-generated concept graphs from a single topic
+    Three levels: central → major components → minor details
+    Click a star → simple-but-precise explanation
+    Double-click (or "Expand") a star → AI generates deeper child nodes
+    Notes you can attach to any node (saved in your browser)
+    Save / Load a whole constellation (also downloads a .json you can share)
+    Drag & drop a saved .json onto the page to reopen it
+    Pan, zoom, drag nodes around
+    100% static — no backend, no cost to host
 
----
+ Step 1 — Get a free Gemini API key
 
-##  How to Deploy on GitHub Pages (Free Lifetime Hosting)
+    Go to https://aistudio.google.com/apikey
+    Sign in with a Google account → Create API key
+    Copy the key (it starts with AIza...)
+    Paste it into the app's "Gemini API key" box
 
-You can launch your own copy of this tool in under 2 minutes:
+    The free tier allows a limited number of requests per minute/day. If you see a
+    "rate limit" message, just wait ~30 seconds. The app remembers your key in your
+    browser so you only paste it once.
 
-1.  **Fork or Create a Repo:** Create a new public repository on GitHub named `knowledge-galaxy`.
-2.  **Add the Code:** Create a file named `index.html` and paste the application code into it. Commit the changes.
-3.  **Enable Pages:** Go to your repository's **Settings** -> **Pages**.
-4.  **Set the Branch:** Under "Build and deployment", change the branch source from *None* to **`main`** (or `master`) and click **Save**.
-5.  **Go Live:** Within a minute, GitHub will give you a live URL (e.g., `https://yourusername.github.io/knowledge-galaxy/`).
+ Step 2 — Publish it FREE on GitHub Pages (lifetime)
 
----
+You don't need to know how to code. Just follow these clicks.
+A. Create the repository
 
-##  How to Use It
+    Make a free account at https://github.com
+    Click the + (top right) → New repository
+    Name it e.g. constellation-explorer
+    Set it to Public, then click Create repository
 
-1.  Open your live web application.
-2.  Input your free **Gemini API Key** (the key runs entirely locally in your browser session and is never sent to a third-party server).
-3.  Type a target concept into the explorer bar. Examples:
-    *   `PortSwigger authentication flow with GET /login`
-    *   `Healthcare IT network infrastructure security`
-    *   `Transformer neural network architecture`
-4.  Click **Generate Constellation** and click on any node to expand the deep text explanation.
+B. Upload the file
 
----
+    On the new repo page click "uploading an existing file"
+    (or Add file → Upload files)
+    Drag in index.html (this file from the project)
+    Click Commit changes
 
-## 📄 License
+C. Turn on GitHub Pages
 
-This project is open-source and free to use for personal and educational purposes. Feel free to modify, expand, or build upon it!
+    In the repo go to Settings (top menu)
+    Left sidebar → Pages
+    Under "Build and deployment" → Source, choose Deploy from a branch
+    Branch: main, folder: / (root) → click Save
+    Wait ~1 minute, refresh. You'll see:
+    "Your site is live at https://YOUR-USERNAME.github.io/constellation-explorer/"
+
+That URL is your permanent, free, shareable tool. 
+Anyone can open it in a browser, paste their own free key, and start exploring.
+
+Updating later
+
+Edit index.html directly on GitHub (pencil icon) → Commit. Pages redeploys
+automatically in about a minute.
+
+A note on the API key
+
+The key lives only in the user's own browser (localStorage) and is sent straight
+to Google's API — it never goes to any server of yours. Each person who uses your
+published tool brings their own free key, so it costs you nothing no matter
+how many people use it.
+
+Run locally first (optional)
+
+Just double-click index.html — it opens in your browser. No install needed.
