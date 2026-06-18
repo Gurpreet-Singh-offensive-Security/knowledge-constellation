@@ -5,7 +5,7 @@
      .             *           .              ✦
             ✦         .      ___                    .              *
    *               .  /   \      .                    ✦
-        .     ✦          (  Welcome To Research Galaxy )         *        .            .
+        .     ✦          (  Welcome To Knowledge Constellation Explorer )         *        .            .
             \___/                 ✦
         ✦    .        .               .                   *
                         *        ✦          .
