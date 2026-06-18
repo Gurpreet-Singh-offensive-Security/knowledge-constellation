@@ -541,12 +541,12 @@ function render(){
     .merge(labels)
       .text(d=>d.id).attr("dx", d=>radiusFor(d.group)+6);
 
-  // galaxy titles (click a title to manage / delete that galaxy)
+  // galaxy titles — DRAG a title to move the whole galaxy; a click (no drag) opens its menu
   titles = g.selectAll("text.galaxy-title").data(galaxies, d => d.seq);
   titles.exit().remove();
   titles = titles.enter().append("text").attr("class","galaxy-title")
-      .style("pointer-events","auto").style("cursor","pointer")
-      .on("click", (e,d)=>{ e.stopPropagation(); openGalaxyMenu(d); })
+      .style("pointer-events","auto").style("cursor","grab")
+      .call(galaxyDrag())
     .merge(titles)
       .text(d=>d.topic);
 
@@ -582,10 +582,11 @@ function applyLOD(){
     if (k < 0.3) return d.group===1 ? 1 : (d.group===2 ? 0.5 : 0.12);
     return d.group===1 ? 1 : 0.9;
   });
-  // big glowing galaxy name takes over when you zoom out
+  // big glowing galaxy name takes over when you zoom out (and only then can it be grabbed)
   if (titles){
     const show = k < 0.5;
     titles.style("opacity", show ? 1 : 0)
+          .style("pointer-events", show ? "auto" : "none")
           .style("font-size", Math.max(12, 22/Math.max(k,0.05)) + "px");
   }
 }
@@ -886,6 +887,35 @@ function drag(){
   return d3.drag().on("start",started).on("drag",dragged).on("end",ended);
 }
 
+/* drag a galaxy's NAME to move the entire galaxy (all its stars) anywhere */
+function galaxyDrag(){
+  let moved = false, startX = 0, startY = 0;
+  function started(e,gx){
+    moved = false; startX = e.x; startY = e.y;
+    if(!e.active) simulation.alphaTarget(0.15).restart();
+    gx.nodes.forEach(n => { n.fx = n.x; n.fy = n.y; });   // hold stars rigid while moving
+  }
+  function dragged(e,gx){
+    const dx = e.x - startX, dy = e.y - startY;
+    if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+    startX = e.x; startY = e.y;
+    gx.center.x += dx; gx.center.y += dy;                 // shift the galaxy's home
+    gx.nodes.forEach(n => { n.fx += dx; n.fy += dy; n.x = n.fx; n.y = n.fy; });
+    // live-update positions so links/labels follow without waiting for a tick
+    if (node) node.attr("cx",d=>d.x).attr("cy",d=>d.y);
+    if (link) link.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y).attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+    if (labels) labels.attr("x",d=>d.x).attr("y",d=>d.y);
+    if (titles) titles.attr("x", d=> d.central ? d.central.x : d.center.x).attr("y", d=> (d.central ? d.central.y : d.center.y) - 30);
+  }
+  function ended(e,gx){
+    if(!e.active) simulation.alphaTarget(0);
+    gx.nodes.forEach(n => { n.fx = null; n.fy = null; });  // release back to physics
+    if (!moved) openGalaxyMenu(gx);                        // a click (no real drag) = open menu
+    else autoSave();                                       // remember the new position
+  }
+  return d3.drag().on("start",started).on("drag",dragged).on("end",ended);
+}
+
 /* persist key locally so you don't retype it */
 const keyInput = document.getElementById('api-key');
 keyInput.value = localStorage.getItem('kc_key') || '';
@@ -905,5 +935,5 @@ document.getElementById('topic-input').addEventListener('keydown', e=>{ if(e.key
   showWelcome();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0dc7e0accb21c87',t:'MTc4MTgwODc1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
