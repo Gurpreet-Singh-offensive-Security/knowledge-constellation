@@ -3,12 +3,12 @@
 ```
             .          ✦              .                   ✦
      .             *           .              ✦
-            ✦         .                      .              *
-   *               .                      .                    ✦
-        .     ✦                           *        .            .
-                  .                            ✦
-        ✦    .        .             .                   *
-                        *      ✦          .
+            ✦         .      ___                    .              *
+   *               .  /   \      .                    ✦
+        .     ✦          (  Welcome To Research Galaxy )         *        .            .
+            \___/                 ✦
+        ✦    .        .               .                   *
+                        *        ✦          .
    .            ✦            *                     .        ✦
 ```
 
@@ -327,6 +327,37 @@ Most "errors" aren't your fault *or* the app's — they're just Google's free se
 
 ---
 
+## ✦ License &amp; credit
+
+<details open>
+<summary><b>[ © ]  Free to use — just keep the credit</b></summary>
+
+<br>
+
+This project is released under the **MIT License with an Attribution Requirement**.
+
+```
+   ✓  use it free          ✓  build your own version
+   ✓  modify / fork it      ✓  even sell it
+   ──────────────────────────────────────────────
+   ✗  but you may NOT remove the credit to the original author
+```
+
+In plain words:
+
+- **Anyone** can use the live app with **their own free API key** — no cost, no signup to you.
+- **Anyone** can fork or modify the code.
+- **But** any copy, fork, or modified version **must keep visible credit** to the original author — both in the running app (the footer credit line) and in the README.
+
+> **Original project:** *Knowledge Constellation Explorer*
+> **Created by:** Gurpreet Singh — **[@Gurpreet-Singh-offensive-Security](https://github.com/Gurpreet-Singh-offensive-Security/knowledge-constellation)**
+
+If you build on this, the honest ask is simple: **leave the credit in, and tag the original.** See [`LICENSE`](LICENSE) for the exact terms.
+
+</details>
+
+---
+
 <div align="center">
 
 ```
@@ -339,6 +370,6 @@ Most "errors" aren't your fault *or* the app's — they're just Google's free se
 **Built because freezing up in front of a real system is the worst feeling —**
 **and a map of stars beats a wall of text every single time.**
 
-*Now go map a galaxy.* ✦
+*Created by Gurpreet Singh ([@Gurpreet-Singh-offensive-Security](https://github.com/Gurpreet-Singh-offensive-Security/knowledge-constellation)) — now go map a galaxy.* ✦
 
 </div>
