@@ -40,6 +40,14 @@ Then you do it again for the next topic. And the next. Each one becomes its own 
 
 Works for *anything* — IT, security, healthcare, finance, biology, law, whatever you're stuck on.
 
+<div align="center">
+
+### ⭐ If this helps you, please give it a Star — it genuinely makes my day and helps others find it.
+
+*(Hit the **Star** button at the top-right of this page. Takes one click. Thank you!)* ✦
+
+</div>
+
 ---
 
 ## ✦ Textbook  vs.  this thing
