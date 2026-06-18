@@ -10,6 +10,8 @@
         body { 
             margin: 0; 
             padding: 0; 
+            width: 100vw;  /* Forces full width */
+            height: 100vh; /* Forces full height so 50% is dead center */
             background-color: #060913; 
             color: #c9d1d9; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
@@ -166,22 +168,19 @@
         // --- Star Generation Logic ---
         function generateBackgroundStars() {
             const container = document.getElementById('star-container');
-            const starCount = 150; // Adjust this number for more or less stars
+            const starCount = 150; 
 
             for (let i = 0; i < starCount; i++) {
                 const star = document.createElement('div');
                 star.className = 'star';
                 
-                // Random position
                 star.style.left = Math.random() * 100 + 'vw';
                 star.style.top = Math.random() * 100 + 'vh';
                 
-                // Random size between 1px and 3px
                 const size = Math.random() * 2 + 1;
                 star.style.width = size + 'px';
                 star.style.height = size + 'px';
                 
-                // Random twinkle speed and delay
                 star.style.animationDuration = (Math.random() * 3 + 2) + 's';
                 star.style.animationDelay = (Math.random() * 3) + 's';
                 
@@ -189,9 +188,7 @@
             }
         }
         
-        // Run star generator on load
         generateBackgroundStars();
-        // ------------------------------
 
         let simulation, svg, link, node, labels;
         const width = window.innerWidth;
@@ -201,7 +198,6 @@
             .attr("width", width)
             .attr("height", height);
 
-        // Add a neon glow filter for the stars
         const defs = svg.append("defs");
         const filter = defs.append("filter").attr("id", "glow");
         filter.append("feGaussianBlur").attr("stdDeviation", "3.5").attr("result", "coloredBlur");
@@ -224,7 +220,6 @@
                 return;
             }
 
-            // Slide UI panel to the top-left corner
             document.getElementById('ui-panel').classList.add('shifted');
             document.getElementById('loading').style.display = 'block';
 
@@ -258,7 +253,6 @@
             } catch (error) {
                 console.error(error);
                 alert("Failed to map space coordinates. Verify your API Key configuration.");
-                // Move panel back if there is an error
                 document.getElementById('ui-panel').classList.remove('shifted');
             } finally {
                 document.getElementById('loading').style.display = 'none';
@@ -286,7 +280,7 @@
                 .enter().append("circle")
                 .attr("r", d => d.group === 1 ? 16 : 8)
                 .attr("fill", d => d.group === 1 ? "#79c0ff" : "#58a6ff")
-                .attr("filter", "url(#glow)") // Applies neon star glow
+                .attr("filter", "url(#glow)") 
                 .style("opacity", d => d.group === 1 ? 1 : 0.85)
                 .call(drag(simulation))
                 .on("click", showInfo);
