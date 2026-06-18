@@ -325,6 +325,40 @@ Most "errors" aren't your fault *or* the app's — they're just Google's free se
 
 </details>
 
+<details>
+<summary><b>[ ⏳ ]  "Please hold…" — why the app sometimes pauses (it's the free tier, not a bug)</b></summary>
+
+<br>
+
+Google's **free** API key only allows a few requests per minute. So when you map
+or expand topics quickly, the app **paces itself** instead of erroring — you'll
+see a friendly green note:
+
+```
+   ⏳  Please hold ~6s — this short pause keeps you inside Google's FREE tier.
+       Nothing is broken; it continues on its own.
+```
+
+```
+   load topic   ✓ instant
+        │
+   expand fast  ──►  ⏳ short auto-pause  ──►  ✓ continues by itself
+        │
+   add galaxy   ──►  ⏳ short auto-pause  ──►  ✓ continues by itself
+```
+
+**Want zero waiting?** Two easy options:
+
+| Option | What to do | Result |
+|---|---|---|
+| **Lite model** | Pick **gemini-2.5-flash-lite** in the dropdown | Higher free limits → shorter pauses |
+| **Paid API key** | Paste a paid Google key in the same box | Limits basically vanish → instant, no pauses |
+
+> So: a paid key removes the waiting entirely, but you **never need one** — the
+> free key works fine, it just paces itself to stay within Google's limits.
+
+</details>
+
 ---
 
 ## ✦ License &amp; credit
@@ -373,3 +407,4 @@ If you build on this, the honest ask is simple: **leave the credit in, and tag t
 *Created by Gurpreet Singh ([@Gurpreet-Singh-offensive-Security](https://github.com/Gurpreet-Singh-offensive-Security/knowledge-constellation)) — now go map a galaxy.* ✦
 
 </div>
+
