@@ -21,6 +21,12 @@ Click to understand. Double-click to dig deeper. Build a whole **universe** of t
 
 <br>
 
+## ▶ &nbsp; [ TRY IT LIVE — no install ](https://gurpreet-singh-offensive-security.github.io/knowledge-constellation/)
+
+*(opens the app — just bring a free Google AI key)*
+
+<br>
+
 ![Type](https://img.shields.io/badge/Type-Single_HTML_File-1f6feb?style=for-the-badge)
 ![Cost](https://img.shields.io/badge/Hosting-Free_Forever-3fb950?style=for-the-badge)
 ![Powered](https://img.shields.io/badge/Powered_by-Gemini-a371f7?style=for-the-badge)
