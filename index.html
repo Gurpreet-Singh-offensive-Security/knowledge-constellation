@@ -231,9 +231,17 @@ function radiusFor(group){ return group === 1 ? 18 : group === 2 ? 10 : 7; }
 function galaxyCenter(i){
   if (i === 0) return { x: width/2, y: height/2 };
   const golden = 2.399963229728653;
-  const r = 560 * Math.sqrt(i + 0.6);
+  const r = 1150 * Math.sqrt(i + 0.6);   // wider spacing so galaxies never crowd each other
   const a = i * golden;
   return { x: width/2 + r*Math.cos(a), y: height/2 + r*Math.sin(a) };
+}
+
+/* measure the bounding box of one galaxy's stars (for fit-to-screen zoom) */
+function galaxyBounds(gx){
+  if (!gx.nodes.length) return { x:gx.center.x-300, y:gx.center.y-300, w:600, h:600 };
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  gx.nodes.forEach(n=>{ minX=Math.min(minX,n.x); minY=Math.min(minY,n.y); maxX=Math.max(maxX,n.x); maxY=Math.max(maxY,n.y); });
+  return { x:minX, y:minY, w:Math.max(maxX-minX,300), h:Math.max(maxY-minY,300) };
 }
 
 /* ---------------- Gemini call ---------------- */
@@ -339,7 +347,7 @@ function addGalaxy(data, topic){
   galaxies.push(gx);
   mergeNotes();
   rebuild();
-  focusGalaxy(gx);
+  setTimeout(()=>focusGalaxy(gx), 900);   // let the layout spread out first, then frame it
 }
 
 /* ---------------- Generate main graph (adds a NEW galaxy) ---------------- */
@@ -477,11 +485,14 @@ function render(){
       .text(d=>d.topic);
 
   simulation = d3.forceSimulation(allNodes)
-    .force("link", d3.forceLink(allLinks).id(d=>d.uid).distance(d=> (d.target.group===3?80:130)).strength(0.5))
-    .force("charge", d3.forceManyBody().strength(-260))
-    .force("x", d3.forceX(d=>d.g.center.x).strength(0.13))
-    .force("y", d3.forceY(d=>d.g.center.y).strength(0.13))
-    .force("collide", d3.forceCollide().radius(d=>radiusFor(d.group)+14))
+    .force("link", d3.forceLink(allLinks).id(d=>d.uid)
+        .distance(d=> (d.target.group===3 ? 130 : d.target.group===2 ? 230 : 200))
+        .strength(0.35))
+    .force("charge", d3.forceManyBody().strength(-900).distanceMax(1400))
+    .force("x", d3.forceX(d=>d.g.center.x).strength(0.045))
+    .force("y", d3.forceY(d=>d.g.center.y).strength(0.045))
+    .force("collide", d3.forceCollide().radius(d=>radiusFor(d.group)+42).strength(1))
+    .velocityDecay(0.45)
     .alpha(0.9).restart();
 
   simulation.on("tick", ()=>{
@@ -499,23 +510,29 @@ function render(){
 /* ---------------- Level of detail (what shows at each zoom) ---------------- */
 function applyLOD(){
   const k = currentK;
-  if (labels) labels.style("opacity", k >= 0.7 ? 1 : 0);
+  // show star labels once you're zoomed in enough to read them
+  if (labels) labels.style("opacity", k >= 0.45 ? 1 : 0);
   if (node) node.style("opacity", d => {
-    if (k < 0.35) return d.group===1 ? 1 : (d.group===2 ? 0.45 : 0.1);
+    if (k < 0.3) return d.group===1 ? 1 : (d.group===2 ? 0.5 : 0.12);
     return d.group===1 ? 1 : 0.9;
   });
+  // big glowing galaxy name takes over when you zoom out
   if (titles){
-    const show = k < 0.75;
+    const show = k < 0.5;
     titles.style("opacity", show ? 1 : 0)
-          .style("font-size", Math.max(11, 20/Math.max(k,0.05)) + "px");
+          .style("font-size", Math.max(12, 22/Math.max(k,0.05)) + "px");
   }
 }
 
-/* smoothly fly to one galaxy */
+/* smoothly fly to one galaxy, zooming so the WHOLE galaxy fits with breathing room */
 function focusGalaxy(gx){
-  const k = 0.9;
-  const t = d3.zoomIdentity.translate(width/2 - gx.center.x*k, height/2 - gx.center.y*k).scale(k);
-  svg.transition().duration(700).call(zoom.transform, t);
+  const pad = 180;
+  const b = galaxyBounds(gx);
+  const w = b.w + pad*2, h = b.h + pad*2;
+  const k = Math.max(0.2, Math.min(1.1, 0.92*Math.min(width/w, height/h)));
+  const cx = b.x + b.w/2, cy = b.y + b.h/2;
+  const t = d3.zoomIdentity.translate(width/2 - cx*k, height/2 - cy*k).scale(k);
+  svg.transition().duration(750).call(zoom.transform, t);
 }
 
 /* click a galaxy's title -> small menu to focus, rename or delete it */
@@ -822,5 +839,5 @@ document.getElementById('topic-input').addEventListener('keydown', e=>{ if(e.key
   showWelcome();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0dc19e8eff1ac54',t:'MTc4MTgwNDY1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0dc2c3919ebb634',t:'MTc4MTgwNTQwOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
