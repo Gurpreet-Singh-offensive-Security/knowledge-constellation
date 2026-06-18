@@ -98,7 +98,7 @@
 
   <!-- Control panel -->
   <div id="ui-panel">
-    <h2>🌌 Constellation Explorer</h2>
+    <h2>✦ Constellation Explorer</h2>
     <p class="muted" style="margin:4px 0 8px;">Pick any topic — IT, healthcare, security, anything. AI maps it into a star map you can explore, expand, and annotate.</p>
 
     <label>Gemini API key (free — <a href="https://aistudio.google.com/apikey" target="_blank">get one here</a>)</label>
@@ -115,12 +115,12 @@
     <label>What do you want to learn?</label>
     <input type="text" id="topic-input" placeholder="e.g. HTTP authentication, sepsis pathophysiology..." />
 
-    <button onclick="generateGraph()">✨ Map Concept</button>
+    <button onclick="generateGraph()">→ Map Concept</button>
     <div class="btn-row">
-      <button class="ghost" onclick="saveConstellation()">💾 Save</button>
-      <button class="ghost" onclick="loadConstellation()">📂 Load</button>
+      <button class="ghost" onclick="saveConstellation()">↓ Save</button>
+      <button class="ghost" onclick="loadConstellation()">↑ Load</button>
     </div>
-    <div id="loading">✨ Mapping galaxy configurations...</div>
+    <div id="loading">Mapping it out, hang on…</div>
     <div id="err"></div>
   </div>
 
@@ -132,11 +132,11 @@
 
     <div class="saved-note" id="saved-note"></div>
 
-    <label>📝 Your notes (saved to this browser)</label>
+    <label>✎ Your notes (saved to this browser)</label>
     <textarea id="note-input" placeholder="Write your own understanding, mnemonics, gotchas..."></textarea>
     <button class="ghost" onclick="saveNote()">Save note</button>
 
-    <button onclick="expandNode()">🔭 Expand this node (dig deeper)</button>
+    <button onclick="expandNode()">＋ Expand this node (dig deeper)</button>
     <button class="ghost" onclick="closeInfo()">Close</button>
   </div>
 
@@ -177,7 +177,11 @@ svg.call(zoom);
 /* ---------------- Helpers ---------------- */
 function showErr(msg){ const e=document.getElementById('err'); e.style.display='block'; e.innerHTML=msg; }
 function hideErr(){ document.getElementById('err').style.display='none'; }
-function setLoading(on){ document.getElementById('loading').style.display = on ? 'block' : 'none'; }
+function setLoading(on){
+  const el = document.getElementById('loading');
+  el.style.display = on ? 'block' : 'none';
+  if (on) el.innerText = 'Mapping it out, hang on…';
+}
 
 function colorFor(group){
   if (group === 1) return "#79c0ff";   // central
@@ -187,44 +191,84 @@ function colorFor(group){
 function radiusFor(group){ return group === 1 ? 18 : group === 2 ? 10 : 7; }
 
 /* ---------------- Gemini call ---------------- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 async function callGemini(prompt){
   const apiKey = document.getElementById('api-key').value.trim();
   const model  = document.getElementById('model-select').value;
   if (!apiKey) throw new Error("NO_KEY");
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.4 }
-    })
+  const body = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { responseMimeType: "application/json", temperature: 0.4 }
   });
 
-  if (!res.ok){
+  // Google's servers throw transient 503 (overloaded) / 500 / 429 errors.
+  // These are NOT bugs — we just retry a few times with growing waits.
+  const maxAttempts = 4;
+  let lastErr = "";
+  for (let attempt = 1; attempt <= maxAttempts; attempt++){
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body
+      });
+    } catch(networkErr){
+      // network dropped — retry
+      lastErr = "NETWORK";
+      if (attempt < maxAttempts){ setRetryMsg(attempt, maxAttempts); await sleep(800 * 2**(attempt-1)); continue; }
+      throw new Error("NETWORK");
+    }
+
+    if (res.ok){
+      const data = await res.json();
+      let text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error("EMPTY");
+      text = text.replace(/```json/gi,'').replace(/```/g,'').trim();
+      return JSON.parse(text);
+    }
+
     const t = await res.text();
+    // permanent errors — no point retrying
     if (res.status === 400 && /API key not valid/i.test(t)) throw new Error("BAD_KEY");
     if (res.status === 404) throw new Error("BAD_MODEL");
-    if (res.status === 429) throw new Error("RATE_LIMIT");
-    throw new Error("HTTP_" + res.status + ": " + t.slice(0,200));
+
+    // transient errors — retry with backoff
+    if (res.status === 503 || res.status === 500 || res.status === 429){
+      lastErr = res.status === 429 ? "RATE_LIMIT" : "OVERLOADED";
+      if (attempt < maxAttempts){
+        setRetryMsg(attempt, maxAttempts);
+        await sleep(1200 * 2**(attempt-1));   // 1.2s, 2.4s, 4.8s
+        continue;
+      }
+      throw new Error(lastErr);
+    }
+
+    throw new Error("HTTP_" + res.status + ": " + t.slice(0,160));
   }
-  const data = await res.json();
-  let text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error("EMPTY");
-  text = text.replace(/```json/gi,'').replace(/```/g,'').trim();
-  return JSON.parse(text);
+  throw new Error(lastErr || "OVERLOADED");
+}
+
+function setRetryMsg(attempt, max){
+  const el = document.getElementById('loading');
+  el.style.display = 'block';
+  el.innerText = `Google's servers are busy — retrying (${attempt}/${max-1})…`;
 }
 
 function explainError(err){
   switch(err.message){
-    case "NO_KEY":    return "Please enter your free Gemini API key first. <a href='https://aistudio.google.com/apikey' target='_blank'>Get one</a>.";
-    case "BAD_KEY":   return "That API key was rejected. Copy it again from <a href='https://aistudio.google.com/apikey' target='_blank'>Google AI Studio</a>.";
-    case "BAD_MODEL": return "That model isn't available on your key. Try <b>gemini-2.5-flash</b> in the Model dropdown.";
-    case "RATE_LIMIT":return "Free-tier rate limit hit (a few requests/min). Wait ~30s and try again.";
-    case "EMPTY":     return "The model returned nothing (possibly a safety block). Try rewording the topic.";
+    case "NO_KEY":     return "Please enter your free Gemini API key first. <a href='https://aistudio.google.com/apikey' target='_blank'>Get one</a>.";
+    case "BAD_KEY":    return "That API key was rejected. Copy it again from <a href='https://aistudio.google.com/apikey' target='_blank'>Google AI Studio</a>.";
+    case "BAD_MODEL":  return "That model isn't available on your key. Try <b>gemini-2.5-flash</b> in the Model dropdown.";
+    case "RATE_LIMIT": return "You're sending requests faster than the free tier allows. Wait ~30s, then try again. (Tip: gemini-2.5-flash-lite has higher limits.)";
+    case "OVERLOADED": return "Google's servers are overloaded right now (their side, not yours). I already retried a few times. Wait a moment and try again — or switch model in the dropdown.";
+    case "NETWORK":    return "Couldn't reach Google — check your internet connection and try again.";
+    case "EMPTY":      return "The model returned nothing (possibly a safety block). Try rewording the topic.";
     default:
-      if (err instanceof SyntaxError) return "The AI returned text that wasn't clean JSON. Try again or switch model.";
+      if (err instanceof SyntaxError) return "The AI returned text that wasn't clean JSON. Just hit the button again — it usually works on the next try.";
       return "Something went wrong: " + err.message;
   }
 }
@@ -361,7 +405,6 @@ function closeInfo(){ document.getElementById("info-panel").style.display="none"
 function saveNote(){
   if (!selectedNode) return;
   selectedNode.note = document.getElementById("note-input").value;
-  // persist notes by id
   const key = "kc_notes";
   const all = JSON.parse(localStorage.getItem(key) || "{}");
   all[selectedNode.id] = selectedNode.note;
@@ -384,7 +427,6 @@ function saveConstellation(){
     topic: document.getElementById('topic-input').value
   };
   localStorage.setItem("kc_saved", JSON.stringify(slim));
-  // also download a file
   const blob = new Blob([JSON.stringify(slim,null,2)], {type:"application/json"});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
