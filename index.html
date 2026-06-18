@@ -255,10 +255,55 @@ function galaxyBounds(gx){
 /* ---------------- Gemini call ---------------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+/* Self-pacing: the free tier allows only a few requests per minute.
+   We keep a minimum gap between calls so rapid expand/add never trips the limit. */
+let lastCallAt = 0;
+function minGapMs(){
+  const model = document.getElementById('model-select').value;
+  // lite model has higher limits -> shorter gap; others get a safer gap
+  return /lite/.test(model) ? 4500 : 6500;
+}
+async function paceRequests(){
+  const gap = minGapMs();
+  const wait = lastCallAt + gap - Date.now();
+  if (wait > 0) await countdown(wait, "Pacing requests so we stay under the free limit");
+  lastCallAt = Date.now();
+}
+async function countdown(ms, label){
+  const el = document.getElementById('loading');
+  el.style.display = 'block';
+  const end = Date.now() + ms;
+  while (Date.now() < end){
+    const secs = Math.ceil((end - Date.now())/1000);
+    el.innerText = `${label}… ${secs}s`;
+    // friendly green note so users know this is the FREE tier pacing, not a bug
+    showOk(
+      `⏳ <b>Please hold ~${secs}s</b> — this short pause keeps you inside Google's <b>free</b> tier ` +
+      `(it allows only a few requests per minute). Nothing is broken; it'll continue on its own.` +
+      `<br><span style="opacity:0.85">Want no waiting? Switch to <b>gemini-2.5-flash-lite</b> for higher free limits, or use a <b>paid API key</b> — then it's instant.</span>`
+    );
+    await sleep(250);
+  }
+  el.innerText = 'Mapping it out, hang on…';
+  hideOk();
+}
+
+/* pull Google's suggested wait (seconds) out of a 429 body if present */
+function parseRetrySeconds(text){
+  try {
+    const j = JSON.parse(text);
+    const d = (j.error?.details||[]).find(x => /RetryInfo/i.test(x['@type']||''));
+    if (d?.retryDelay){ const m = String(d.retryDelay).match(/([\d.]+)/); if (m) return Math.ceil(parseFloat(m[1])); }
+  } catch(e){}
+  return null;
+}
+
 async function callGemini(prompt){
   const apiKey = document.getElementById('api-key').value.trim();
   const model  = document.getElementById('model-select').value;
   if (!apiKey) throw new Error("NO_KEY");
+
+  await paceRequests();   // self-throttle before every call
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const body = JSON.stringify({
@@ -266,9 +311,9 @@ async function callGemini(prompt){
     generationConfig: { responseMimeType: "application/json", temperature: 0.4 }
   });
 
-  // Google's servers throw transient 503 (overloaded) / 500 / 429 errors.
-  // These are NOT bugs — we just retry a few times with growing waits.
-  const maxAttempts = 4;
+  // Google's servers throw transient 503 (overloaded) / 500 / 429 (rate limit) errors.
+  // These are NOT bugs — we wait the right amount and retry.
+  const maxAttempts = 5;
   let lastErr = "";
   for (let attempt = 1; attempt <= maxAttempts; attempt++){
     let res;
@@ -285,6 +330,7 @@ async function callGemini(prompt){
     }
 
     if (res.ok){
+      lastCallAt = Date.now();
       const data = await res.json();
       let text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!text) throw new Error("EMPTY");
@@ -296,14 +342,26 @@ async function callGemini(prompt){
     if (res.status === 400 && /API key not valid/i.test(t)) throw new Error("BAD_KEY");
     if (res.status === 404) throw new Error("BAD_MODEL");
 
-    if (res.status === 503 || res.status === 500 || res.status === 429){
-      lastErr = res.status === 429 ? "RATE_LIMIT" : "OVERLOADED";
+    if (res.status === 429){
+      // rate limit: wait the time Google suggests (or ~35s), then retry
+      lastErr = "RATE_LIMIT";
+      if (attempt < maxAttempts){
+        const secs = parseRetrySeconds(t) || 35;
+        await countdown((secs+1)*1000, "Free-tier limit reached — auto-resuming in");
+        lastCallAt = Date.now();
+        continue;
+      }
+      throw new Error("RATE_LIMIT");
+    }
+
+    if (res.status === 503 || res.status === 500){
+      lastErr = "OVERLOADED";
       if (attempt < maxAttempts){
         setRetryMsg(attempt, maxAttempts);
         await sleep(1200 * 2**(attempt-1));
         continue;
       }
-      throw new Error(lastErr);
+      throw new Error("OVERLOADED");
     }
 
     throw new Error("HTTP_" + res.status + ": " + t.slice(0,160));
@@ -322,7 +380,7 @@ function explainError(err){
     case "NO_KEY":     return "Please enter your free Gemini API key first. <a href='https://aistudio.google.com/apikey' target='_blank'>Get one</a>.";
     case "BAD_KEY":    return "That API key was rejected. Copy it again from <a href='https://aistudio.google.com/apikey' target='_blank'>Google AI Studio</a>.";
     case "BAD_MODEL":  return "That model isn't available on your key. Try <b>gemini-2.5-flash</b> in the Model dropdown.";
-    case "RATE_LIMIT": return "You're sending requests faster than the free tier allows. Wait ~30s, then try again. (Tip: gemini-2.5-flash-lite has higher limits.)";
+    case "RATE_LIMIT": return "Still hitting the free-tier limit after waiting. The free key allows only a few requests per minute. Options: wait a minute and retry, switch to <b>gemini-2.5-flash-lite</b> (higher limits), or use a paid API key (limits basically disappear).";
     case "OVERLOADED": return "Google's servers are overloaded right now (their side, not yours). I already retried a few times. Wait a moment and try again — or switch model in the dropdown.";
     case "NETWORK":    return "Couldn't reach Google — check your internet connection and try again.";
     case "EMPTY":      return "The model returned nothing (possibly a safety block). Try rewording the topic.";
@@ -847,5 +905,5 @@ document.getElementById('topic-input').addEventListener('keydown', e=>{ if(e.key
   showWelcome();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0dc40f42f4fac3f',t:'MTc4MTgwNjI1Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0dc5effcb4974a7',t:'MTc4MTgwNzQ4Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
