@@ -1,0 +1,43 @@
+AUTHORS
+=======
+
+Knowledge Constellation Explorer
+An interactive tool that turns any topic into an explorable "galaxy" of
+connected concept stars. Free, open-source, single-file web app.
+
+--------------------------------------------------------------------------
+Original author & creator
+--------------------------------------------------------------------------
+Gurpreet Singh  (@Gurpreet-Singh-offensive-Security)
+GitHub:  https://github.com/Gurpreet-Singh-offensive-Security
+Project: https://github.com/Gurpreet-Singh-offensive-Security/knowledge-constellation
+
+--------------------------------------------------------------------------
+Authorship statement
+--------------------------------------------------------------------------
+This software is the original, independent work of Gurpreet Singh.
+All code in this repository (notably index.html) was written from scratch
+by the author and was not copied from any other project. Any resemblance
+to other tools that share a similar name or theme is coincidental and the
+result of independent creation.
+
+The project's name and concept theme are not claimed as exclusive; the
+copyright applies to the original source code of THIS repository only,
+as governed by the LICENSE file (MIT License with Attribution Requirement).
+
+--------------------------------------------------------------------------
+Dates
+--------------------------------------------------------------------------
+Created:        2026-06-18
+Author of record: Gurpreet Singh (@Gurpreet-Singh-offensive-Security)
+
+(The authoritative, tamper-evident record of authorship and creation
+dates is this repository's Git commit history.)
+
+--------------------------------------------------------------------------
+Contributors
+--------------------------------------------------------------------------
+- Gurpreet Singh (@Gurpreet-Singh-offensive-Security) — creator, all code
+
+If you contribute to this project, add your name above in the form:
+  - Your Name (@your-handle) — what you contributed
