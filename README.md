@@ -29,7 +29,7 @@ Click to understand. Double-click to dig deeper. Build a whole **universe** of t
 
 ![Type](https://img.shields.io/badge/Type-Single_HTML_File-1f6feb?style=for-the-badge)
 ![Cost](https://img.shields.io/badge/Hosting-Free_Forever-3fb950?style=for-the-badge)
-![Powered](https://img.shields.io/badge/Powered_by-Gemini-a371f7?style=for-the-badge)
+![Powered](https://img.shields.io/badge/AI-Gemini_·_OpenAI_·_Claude_·_DeepSeek_·_Ollama-a371f7?style=for-the-badge)
 ![Backend](https://img.shields.io/badge/Backend-None_Needed-8b949e?style=for-the-badge)
 
 </div>
@@ -260,6 +260,8 @@ Sign in with any Google account, hit *Create API key*, copy the string starting 
 **2 · Open the app** → just double-click `index.html`. That's the entire install.
 
 **3 · Paste the key, type a topic, hit Map.** Your first galaxy is born.
+
+> **Prefer another AI?** Use the **provider dropdown** to switch to OpenAI (GPT), Anthropic (Claude), DeepSeek, or a local **Ollama** model — just paste that provider's key. Gemini stays the free default; everything else is bring-your-own-key. *(All calls run straight from your browser, so a provider must allow that; Gemini, OpenAI and Claude do. Ollama works best when you run the file locally.)*
 
 > Free tier has a per-minute request limit. If it asks you to slow down, wait ~30s. Your key is remembered, so you only paste it once.
 
