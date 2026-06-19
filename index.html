@@ -145,6 +145,26 @@
   a { color: var(--accent); }
   .saved-note { margin-top:12px; padding:10px; border-radius:8px; background:rgba(63,185,80,0.08); border:1px solid rgba(63,185,80,0.3); font-size:0.85rem; white-space:pre-wrap; display:none; }
 
+  /* ---- Search across the universe (lives inside the control panel) ---- */
+  #search-box {
+    width:100%; padding:10px 13px; border-radius:8px; margin-top:8px;
+    background:rgba(1,4,9,0.6); border:1px solid rgba(88,166,255,0.35);
+    color:#fff; font-size:0.9rem; font-family:inherit; transition:0.2s;
+  }
+  #search-box:focus { outline:none; border-color:#58a6ff; box-shadow:0 0 10px rgba(88,166,255,0.35); }
+  #search-results {
+    margin-top:6px; max-height:34vh; overflow-y:auto; border-radius:10px;
+    background:rgba(1,4,9,0.5); border:1px solid rgba(88,166,255,0.2);
+    display:none;
+  }
+  #search-results.show { display:block; }
+  .sr-item { padding:9px 14px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.05); transition:0.15s; }
+  .sr-item:last-child { border-bottom:none; }
+  .sr-item:hover, .sr-item.active { background:rgba(88,166,255,0.15); }
+  .sr-title { font-size:0.88rem; color:#c9d1d9; font-weight:500; }
+  .sr-galaxy { font-size:0.72rem; color:#6e7681; margin-top:2px; }
+  .sr-empty { padding:12px 14px; font-size:0.82rem; color:#8b949e; }
+
   /* ---- Mobile / small screens ---- */
   @media (max-width: 768px) {
     #ui-panel { max-height: 86vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -196,6 +216,11 @@
     <button onclick="generateGraph()">→ Map Concept (new galaxy)</button>
     <div class="btn-row">
       <button class="ghost" onclick="fitAll()">⊙ See all galaxies</button>
+      <button class="ghost" onclick="toggleSearch()">⌕ Search</button>
+    </div>
+    <div id="search-wrap" style="display:none;">
+      <input id="search-box" type="text" placeholder="Type a galaxy or node name…" oninput="runSearch(this.value)" onkeydown="searchKey(event)" autocomplete="off" />
+      <div id="search-results"></div>
     </div>
     <div class="btn-row">
       <button class="ghost" onclick="saveConstellation()">↓ Save file</button>
@@ -812,6 +837,78 @@ function focusGalaxy(gx){
   svg.transition().duration(750).call(zoom.transform, t);
 }
 
+/* ---------------- Search across the universe ---------------- */
+let searchHits = [], searchActive = -1;
+function toggleSearch(){
+  const wrap = document.getElementById('search-wrap');
+  const open = wrap.style.display === 'none' || !wrap.style.display;
+  if (open){
+    if (!galaxies.length){ showErr("No galaxies yet — map a topic first, then search it."); return; }
+    wrap.style.display = 'block';
+    const s = document.getElementById('search-box'); s.value=''; s.focus();
+  } else {
+    wrap.style.display = 'none';
+    closeSearch();
+  }
+}
+function runSearch(q){
+  q = (q||"").trim().toLowerCase();
+  const box = document.getElementById('search-results');
+  searchHits = []; searchActive = -1;
+  if (!q){ box.classList.remove('show'); box.innerHTML=''; return; }
+  // match node id OR description OR galaxy topic, across every galaxy
+  galaxies.forEach(gx => gx.nodes.forEach(n => {
+    const hay = (n.id + " " + (n.description||"") + " " + gx.topic).toLowerCase();
+    if (hay.includes(q)) searchHits.push(n);
+  }));
+  searchHits.sort((a,b)=>{
+    // prioritise matches in the node name, then bigger (central/major) nodes
+    const an = a.id.toLowerCase().includes(q)?0:1, bn = b.id.toLowerCase().includes(q)?0:1;
+    return an-bn || a.group-b.group;
+  });
+  const hits = searchHits.slice(0, 40);
+  if (!hits.length){ box.innerHTML = '<div class="sr-empty">No matches across your galaxies.</div>'; box.classList.add('show'); return; }
+  box.innerHTML = hits.map((n,i)=>(
+    `<div class="sr-item" data-i="${i}" onclick="gotoSearchHit(${i})">`+
+      `<div class="sr-title">${escapeHtml(n.id)}</div>`+
+      `<div class="sr-galaxy">in ${escapeHtml(n.g.topic)}${n.group===1?' · central':n.group===2?' · major':''}</div>`+
+    `</div>`
+  )).join('');
+  box.classList.add('show');
+}
+function gotoSearchHit(i){
+  const n = searchHits[i];
+  if (!n) return;
+  // fly to the node and open its details
+  const k = 1.0;
+  const t = d3.zoomIdentity.translate(width/2 - n.x*k, height/2 - n.y*k).scale(k);
+  svg.transition().duration(650).call(zoom.transform, t);
+  setTimeout(()=>showInfo(null, n), 350);
+  closeSearch();
+  document.getElementById('search-wrap').style.display = 'none';
+  if (isMobile()) collapsePanel();   // on phones, hide the panel so the found node is visible
+}
+function searchKey(e){
+  const box = document.getElementById('search-results');
+  if (e.key === 'Escape'){ closeSearch(); return; }
+  if (e.key === 'ArrowDown'){ e.preventDefault(); moveSearch(1); }
+  else if (e.key === 'ArrowUp'){ e.preventDefault(); moveSearch(-1); }
+  else if (e.key === 'Enter'){ e.preventDefault(); gotoSearchHit(searchActive >= 0 ? searchActive : 0); }
+}
+function moveSearch(dir){
+  const items = [...document.querySelectorAll('.sr-item')];
+  if (!items.length) return;
+  searchActive = (searchActive + dir + items.length) % items.length;
+  items.forEach((el,idx)=>el.classList.toggle('active', idx===searchActive));
+  items[searchActive].scrollIntoView({block:'nearest'});
+}
+function closeSearch(){
+  const box = document.getElementById('search-results');
+  box.classList.remove('show'); box.innerHTML='';
+  document.getElementById('search-box').blur();
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 /* click a galaxy's title -> small menu to focus, rename or delete it */
 function openGalaxyMenu(gx){
   const choice = prompt(
@@ -1185,8 +1282,17 @@ keyInput.addEventListener('change', ()=>{
 });
 document.getElementById('topic-input').addEventListener('keydown', e=>{ if(e.key==='Enter') generateGraph(); });
 
-/* Esc closes the node detail panel */
+/* Keyboard: "/" opens search, Esc closes panels */
 document.addEventListener('keydown', e=>{
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName||''));
+  if (e.key === '/' && !typing){
+    e.preventDefault();
+    openPanel();   // make sure the control panel is visible first
+    const wrap = document.getElementById('search-wrap');
+    if (wrap.style.display === 'none' || !wrap.style.display) toggleSearch();
+    else { const s = document.getElementById('search-box'); s.focus(); s.select(); }
+    return;
+  }
   if (e.key === 'Escape' && document.getElementById('info-panel').style.display === 'block') closeInfo();
 });
 
@@ -1203,5 +1309,5 @@ document.addEventListener('keydown', e=>{
   showWelcome();
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0df01a7bb8a93b7',t:'MTc4MTgzNTEyMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
