@@ -55,13 +55,36 @@
   #ui-panel {
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%); width: 360px; max-width: 92vw;
+    max-height: 90vh; overflow-y: auto;
     background: var(--panel); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    padding: 24px; border-radius: 16px;
+    padding: 20px; border-radius: 16px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 0 15px rgba(88,166,255,0.2);
     border: 1px solid rgba(88,166,255,0.25); z-index: 10;
     transition: all 0.6s cubic-bezier(0.25, 1, 0.5, 1);
   }
-  #ui-panel.shifted { top: 20px; left: 20px; transform: translate(0,0); width: 300px; }
+  #ui-panel.shifted { top: 20px; left: 20px; transform: translate(0,0); width: 290px; max-height: calc(100vh - 40px); }
+  #ui-panel.collapsed { display: none; }
+
+  /* visible custom scrollbars so users know the panels scroll */
+  #ui-panel, #info-panel { scrollbar-width: thin; scrollbar-color: #58a6ff rgba(255,255,255,0.06); }
+  #ui-panel::-webkit-scrollbar, #info-panel::-webkit-scrollbar { width: 9px; }
+  #ui-panel::-webkit-scrollbar-track, #info-panel::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 8px; }
+  #ui-panel::-webkit-scrollbar-thumb, #info-panel::-webkit-scrollbar-thumb { background: linear-gradient(#58a6ff,#1f6feb); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+  #ui-panel::-webkit-scrollbar-thumb:hover, #info-panel::-webkit-scrollbar-thumb:hover { background: #79c0ff; background-clip: content-box; }
+  #collapse-btn {
+    position: sticky; top: 0; float: right; width: 30px; height: 30px; padding: 0;
+    margin: 0 0 -30px 0; border-radius: 8px; background: #21262d; box-shadow: none;
+    font-size: 1.2rem; line-height: 1; font-weight: 700; color: #adbac7; z-index: 2;
+  }
+  #collapse-btn:hover { background: #2d333b; transform: none; box-shadow: none; }
+  #fab {
+    position: absolute; top: 18px; left: 18px; width: 52px; height: 52px; padding: 0; margin: 0;
+    border-radius: 50%; z-index: 11; font-size: 1.5rem; line-height: 1;
+    background: linear-gradient(135deg, #1f6feb 0%, #1152b3 100%);
+    box-shadow: 0 4px 16px rgba(31,111,235,0.5), 0 0 18px rgba(88,166,255,0.4);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #fab:hover { transform: scale(1.08); }
 
   /* Info / detail panel */
   #info-panel {
@@ -74,10 +97,10 @@
   }
   h2 { margin: 0 0 6px; font-size: 1.25rem; color: var(--accent); font-weight: 600; letter-spacing: 0.3px; }
   .muted { font-size: 0.8rem; color: #8b949e; }
-  label { font-size: 0.78rem; color: #8b949e; display: block; margin: 12px 0 4px; }
+  label { font-size: 0.78rem; color: #8b949e; display: block; margin: 9px 0 3px; }
 
   input[type="text"], input[type="password"], select, textarea {
-    width: 100%; padding: 11px; margin: 2px 0; background: rgba(1,4,9,0.6);
+    width: 100%; padding: 9px 11px; margin: 2px 0; background: rgba(1,4,9,0.6);
     border: 1px solid var(--line); color: #fff; border-radius: 8px; transition: 0.25s;
     font-family: inherit; font-size: 0.9rem;
   }
@@ -87,7 +110,7 @@
   button {
     width: 100%; padding: 11px; background: linear-gradient(135deg, #1f6feb 0%, #1152b3 100%);
     color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem;
-    transition: 0.25s; box-shadow: 0 4px 12px rgba(31,111,235,0.3); margin-top: 10px;
+    transition: 0.25s; box-shadow: 0 4px 12px rgba(31,111,235,0.3); margin-top: 8px;
   }
   button:hover { background: linear-gradient(135deg, #388bfd 0%, #1f6feb 100%); box-shadow: 0 4px 18px rgba(56,139,253,0.5); transform: translateY(-1px); }
   button.ghost { background: #21262d; box-shadow: none; }
@@ -95,7 +118,7 @@
   button.ghost.danger { color: #ff7b72; }
   button.ghost.danger:hover { background: rgba(248,81,73,0.15); }
   .btn-row { display: flex; gap: 8px; }
-  .btn-row button { margin-top: 10px; }
+  .btn-row button { margin-top: 8px; }
 
   #graph-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; touch-action: none; }
   #graph-container svg { touch-action: none; }
@@ -140,6 +163,7 @@
 
   <!-- Control panel -->
   <div id="ui-panel">
+    <button id="collapse-btn" onclick="collapsePanel()" title="Minimize panel">—</button>
     <h2>✦ Constellation Explorer</h2>
     <p class="muted" style="margin:4px 0 8px;">Map any topic into a galaxy of stars. Free with Google Gemini — or bring your own OpenAI, Claude, DeepSeek, or local Ollama key.</p>
 
@@ -208,6 +232,7 @@
     <button class="ghost" onclick="closeInfo()">Close</button>
   </div>
 
+  <button id="fab" onclick="openPanel()" title="Open controls" style="display:none;">✦</button>
   <div id="graph-container"></div>
   <div class="hint">Click a star = details &nbsp;•&nbsp; Double-click = expand &nbsp;•&nbsp; Scroll = zoom &nbsp;•&nbsp; Zoom out to see all galaxies &nbsp;•&nbsp; Click a galaxy's name = rename / delete it</div>
   <div id="galaxy-count"></div>
@@ -636,6 +661,7 @@ Every id must be unique. Every link source/target must match an existing node id
     autoSave();
     hideSuggestions();
     document.getElementById('topic-input').value = "";
+    if (isMobile()) collapsePanel();   // on phones, get the panel out of the way so the galaxy shows
     showOk(`Added <b>"${topic}"</b> as a new galaxy. Type another topic to add more — or hit <b>See all galaxies</b> to view your whole universe.`);
   } catch(err){
     console.error(err);
@@ -985,6 +1011,17 @@ function hideSuggestions(){
   if (s) s.style.display = 'none';
 }
 
+/* collapse the control panel into a small floating button, and reopen it */
+function collapsePanel(){
+  document.getElementById('ui-panel').classList.add('collapsed');
+  document.getElementById('fab').style.display = 'flex';
+}
+function openPanel(){
+  document.getElementById('ui-panel').classList.remove('collapsed');
+  document.getElementById('fab').style.display = 'none';
+}
+function isMobile(){ return window.matchMedia('(max-width: 768px)').matches; }
+
 /* copy a node's explanation to clipboard */
 function copyExplanation(btn){
   const text = (selectedNode && selectedNode.description) ? selectedNode.description : document.getElementById('info-desc').innerText;
@@ -1158,7 +1195,7 @@ document.addEventListener('keydown', e=>{
   if (loadFromHash()){ hideSuggestions(); return; }   // opened a shared link
   const raw = localStorage.getItem("kc_saved");
   if (raw){                              // bring back the last universe
-    try { loadSnapshot(JSON.parse(raw)); document.getElementById('ui-panel').classList.add('shifted'); hideSuggestions(); updateSavedStamp(); setTimeout(fitAll,500); return; } catch(e){}
+    try { loadSnapshot(JSON.parse(raw)); document.getElementById('ui-panel').classList.add('shifted'); hideSuggestions(); updateSavedStamp(); if (isMobile()) collapsePanel(); setTimeout(fitAll,500); return; } catch(e){}
   }
   if (!localStorage.getItem('kc_seen')){ // first-ever visit
     localStorage.setItem('kc_seen','1');
@@ -1166,5 +1203,5 @@ document.addEventListener('keydown', e=>{
   showWelcome();
 })();
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0defa876dc593b7',t:'MTc4MTgzNDgyOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
