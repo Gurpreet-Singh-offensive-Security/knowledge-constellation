@@ -21,6 +21,121 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Knowledge Constellation Explorer</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
+<!-- LZ-String (MIT, by pieroxy: github.com/pieroxy/lz-string) — inlined so the app stays self-contained. Used to compress share links. -->
+<script>
+var LZString=(function(){
+  var f=String.fromCharCode;
+  var keyStrUriSafe="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$";
+  var baseReverseDic={};
+  function getBaseValue(alphabet,character){
+    if(!baseReverseDic[alphabet]){baseReverseDic[alphabet]={};for(var i=0;i<alphabet.length;i++){baseReverseDic[alphabet][alphabet.charAt(i)]=i;}}
+    return baseReverseDic[alphabet][character];
+  }
+  var LZString={
+    compressToEncodedURIComponent:function(input){
+      if(input==null)return"";
+      return LZString._compress(input,6,function(a){return keyStrUriSafe.charAt(a);});
+    },
+    decompressFromEncodedURIComponent:function(input){
+      if(input==null)return"";
+      if(input=="")return null;
+      input=input.replace(/ /g,"+");
+      return LZString._decompress(input.length,32,function(index){return getBaseValue(keyStrUriSafe,input.charAt(index));});
+    },
+    _compress:function(uncompressed,bitsPerChar,getCharFromInt){
+      if(uncompressed==null)return"";
+      var i,value,context_dictionary={},context_dictionaryToCreate={},context_c="",context_wc="",context_w="",
+          context_enlargeIn=2,context_dictSize=3,context_numBits=2,context_data=[],context_data_val=0,context_data_position=0,ii;
+      for(ii=0;ii<uncompressed.length;ii+=1){
+        context_c=uncompressed.charAt(ii);
+        if(!Object.prototype.hasOwnProperty.call(context_dictionary,context_c)){context_dictionary[context_c]=context_dictSize++;context_dictionaryToCreate[context_c]=true;}
+        context_wc=context_w+context_c;
+        if(Object.prototype.hasOwnProperty.call(context_dictionary,context_wc)){context_w=context_wc;}
+        else{
+          if(Object.prototype.hasOwnProperty.call(context_dictionaryToCreate,context_w)){
+            if(context_w.charCodeAt(0)<256){
+              for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}}
+              value=context_w.charCodeAt(0);
+              for(i=0;i<8;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}
+            }else{
+              value=1;
+              for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1)|value;if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=0;}
+              value=context_w.charCodeAt(0);
+              for(i=0;i<16;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}
+            }
+            context_enlargeIn--;
+            if(context_enlargeIn==0){context_enlargeIn=Math.pow(2,context_numBits);context_numBits++;}
+            delete context_dictionaryToCreate[context_w];
+          }else{
+            value=context_dictionary[context_w];
+            for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}
+          }
+          context_enlargeIn--;
+          if(context_enlargeIn==0){context_enlargeIn=Math.pow(2,context_numBits);context_numBits++;}
+          context_dictionary[context_wc]=context_dictSize++;
+          context_w=String(context_c);
+        }
+      }
+      if(context_w!==""){
+        if(Object.prototype.hasOwnProperty.call(context_dictionaryToCreate,context_w)){
+          if(context_w.charCodeAt(0)<256){
+            for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}}
+            value=context_w.charCodeAt(0);
+            for(i=0;i<8;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}
+          }else{
+            value=1;
+            for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1)|value;if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=0;}
+            value=context_w.charCodeAt(0);
+            for(i=0;i<16;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}
+          }
+          context_enlargeIn--;
+          if(context_enlargeIn==0){context_enlargeIn=Math.pow(2,context_numBits);context_numBits++;}
+          delete context_dictionaryToCreate[context_w];
+        }else{
+          value=context_dictionary[context_w];
+          for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}
+        }
+        context_enlargeIn--;
+        if(context_enlargeIn==0){context_enlargeIn=Math.pow(2,context_numBits);context_numBits++;}
+      }
+      value=2;
+      for(i=0;i<context_numBits;i++){context_data_val=(context_data_val<<1)|(value&1);if(context_data_position==bitsPerChar-1){context_data_position=0;context_data.push(getCharFromInt(context_data_val));context_data_val=0;}else{context_data_position++;}value=value>>1;}
+      while(true){context_data_val=(context_data_val<<1);if(context_data_position==bitsPerChar-1){context_data.push(getCharFromInt(context_data_val));break;}else{context_data_position++;}}
+      return context_data.join('');
+    },
+    _decompress:function(length,resetValue,getNextValue){
+      var dictionary=[],enlargeIn=4,dictSize=4,numBits=3,entry="",result=[],i,w,bits,resb,maxpower,power,c,
+          data={val:getNextValue(0),position:resetValue,index:1};
+      for(i=0;i<3;i+=1){dictionary[i]=i;}
+      bits=0;maxpower=Math.pow(2,2);power=1;
+      while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++);}bits|=(resb>0?1:0)*power;power<<=1;}
+      switch(bits){
+        case 0:bits=0;maxpower=Math.pow(2,8);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++);}bits|=(resb>0?1:0)*power;power<<=1;}c=f(bits);break;
+        case 1:bits=0;maxpower=Math.pow(2,16);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++);}bits|=(resb>0?1:0)*power;power<<=1;}c=f(bits);break;
+        case 2:return"";
+      }
+      dictionary[3]=c;w=c;result.push(c);
+      while(true){
+        if(data.index>length){return"";}
+        bits=0;maxpower=Math.pow(2,numBits);power=1;
+        while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++);}bits|=(resb>0?1:0)*power;power<<=1;}
+        switch(c=bits){
+          case 0:bits=0;maxpower=Math.pow(2,8);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++);}bits|=(resb>0?1:0)*power;power<<=1;}dictionary[dictSize++]=f(bits);c=dictSize-1;enlargeIn--;break;
+          case 1:bits=0;maxpower=Math.pow(2,16);power=1;while(power!=maxpower){resb=data.val&data.position;data.position>>=1;if(data.position==0){data.position=resetValue;data.val=getNextValue(data.index++);}bits|=(resb>0?1:0)*power;power<<=1;}dictionary[dictSize++]=f(bits);c=dictSize-1;enlargeIn--;break;
+          case 2:return result.join('');
+        }
+        if(enlargeIn==0){enlargeIn=Math.pow(2,numBits);numBits++;}
+        if(dictionary[c]){entry=dictionary[c];}else{if(c===dictSize){entry=w+w.charAt(0);}else{return null;}}
+        result.push(entry);
+        dictionary[dictSize++]=w+entry.charAt(0);enlargeIn--;
+        w=entry;
+        if(enlargeIn==0){enlargeIn=Math.pow(2,numBits);numBits++;}
+      }
+    }
+  };
+  return LZString;
+})();
+</script>
 <style>
   :root {
     --bg: #060913;
@@ -165,6 +280,22 @@
   .sr-galaxy { font-size:0.72rem; color:#6e7681; margin-top:2px; }
   .sr-empty { padding:12px 14px; font-size:0.82rem; color:#8b949e; }
 
+  /* ---- Read-only viewing mode: hide all editing controls ---- */
+  body.readonly #provider-select, body.readonly #api-key, body.readonly #model-select,
+  body.readonly #key-label, body.readonly #topic-input, body.readonly #suggestions,
+  body.readonly button[onclick="generateGraph()"],
+  body.readonly button[onclick="saveConstellation()"],
+  body.readonly button[onclick="loadConstellation()"],
+  body.readonly button[onclick="shareConstellation()"],
+  body.readonly button[onclick="startOver()"],
+  body.readonly #share-readonly-row, body.readonly #undo-row,
+  body.readonly label[for], body.readonly #ui-panel > label,
+  body.readonly #note-input, body.readonly button[onclick="saveNote()"],
+  body.readonly button[onclick="expandNode()"],
+  body.readonly button[onclick="deleteCurrentGalaxy()"],
+  body.readonly #info-panel label { display: none !important; }
+  body.readonly #ui-panel h2::after { content: " · view only"; font-size: 0.7rem; color:#8b949e; font-weight:400; }
+
   /* ---- Mobile / small screens ---- */
   @media (max-width: 768px) {
     #ui-panel { max-height: 86vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -230,6 +361,10 @@
       <button class="ghost" onclick="shareConstellation()">⇗ Share</button>
       <button class="ghost danger" onclick="startOver()">✕ New</button>
     </div>
+    <label id="share-readonly-row" style="display:flex; align-items:center; gap:7px; font-size:0.74rem; margin:8px 0 0; cursor:pointer;">
+      <input type="checkbox" id="share-readonly" style="width:auto; margin:0;" />
+      Make the share link <b>read-only</b> (viewers can't edit)
+    </label>
     <div class="btn-row" id="undo-row" style="display:none;">
       <button class="ghost" onclick="recoverLastDeleted()">↺ Recover last deleted galaxy</button>
     </div>
@@ -699,6 +834,7 @@ Every id must be unique. Every link source/target must match an existing node id
 
 /* ---------------- Expand a node (adds children to its galaxy) ---------------- */
 async function expandNode(){
+  if (window._readOnly) return;
   if (!selectedNode) return;
   hideErr();
   setLoading(true);
@@ -763,7 +899,7 @@ function render(){
   node = node.enter().append("circle").attr("class","nd")
       .attr("filter","url(#glow)")
       .on("click", showInfo)
-      .on("dblclick", (e,d)=>{ e.stopPropagation(); selectedNode=d; expandNode(); })
+      .on("dblclick", (e,d)=>{ if(window._readOnly) return; e.stopPropagation(); selectedNode=d; expandNode(); })
       .call(drag())
     .merge(node)
       .attr("r", d=>radiusFor(d.group))
@@ -1152,22 +1288,24 @@ function loadConstellation(){
 function shareConstellation(){
   if (!galaxies.length){ showErr("Map a topic first, then you can share it."); return; }
   const json = JSON.stringify(snapshot());
-  let encoded;
-  try { encoded = btoa(unescape(encodeURIComponent(json))); } catch(e){ encoded = ""; }
+  // compress the universe so even big ones fit in a link (LZ-String, URL-safe)
+  let packed = "";
+  try { packed = LZString.compressToEncodedURIComponent(json); } catch(e){ packed = ""; }
   const base = location.href.split('#')[0].split('?')[0];
-  const linkUrl = base + "#p=" + encoded;
+  const readonly = document.getElementById('share-readonly').checked;
+  const linkUrl = base + (readonly ? "?readonly=1" : "") + "#z=" + packed;
 
-  if (encoded && linkUrl.length < 8000){
+  if (packed && linkUrl.length < 16000){
     const safe = linkUrl.replace(/"/g,'&quot;');
     showOk(
-      "Share link ready — copy it and paste in your class group / chat:" +
+      (readonly ? "Read-only" : "Editable") + " share link ready — paste it in your class group / chat:" +
       "<input class='sharebox' readonly onclick='this.select()' value=\"" + safe + "\">" +
       "<button class='ghost' style='margin-top:8px' onclick='copyShareLink(this)'>Copy link</button>"
     );
     window._lastShareLink = linkUrl;
   } else {
     saveConstellation();
-    showOk("This universe is big, so a link won't fit. I've downloaded a <b>.json file</b> instead — share that file (email / class drive / chat). Anyone can open it by dragging it onto this page.");
+    showOk("This universe is very big, so even a compressed link won't fit. I've downloaded a <b>.json file</b> instead — share that file (email / class drive / chat). Anyone can open it by dragging it onto this page.");
   }
 }
 function copyShareLink(btn){
@@ -1179,15 +1317,35 @@ function copyShareLink(btn){
 }
 function loadFromHash(){
   const h = location.hash;
-  if (!h.startsWith("#p=")) return false;
+  let json = null;
   try {
-    const json = decodeURIComponent(escape(atob(h.slice(3))));
+    if (h.startsWith("#z=")) {                 // new: LZ-String compressed
+      json = LZString.decompressFromEncodedURIComponent(h.slice(3));
+    } else if (h.startsWith("#p=")) {          // old: base64 (back-compat)
+      json = decodeURIComponent(escape(atob(h.slice(3))));
+    } else {
+      return false;
+    }
+    if (!json) return false;
     loadSnapshot(JSON.parse(json));
     document.getElementById('ui-panel').classList.add('shifted');
-    showOk("Opened a shared universe. Add your own notes, expand nodes, or hit <b>New</b> to start fresh.");
+    // read-only mode if the link says so
+    if (/[?&]readonly=1/.test(location.search)) {
+      enableReadOnly();
+      showOk("Opened a <b>read-only</b> shared universe. Explore freely — pan, zoom, click stars. (Editing is off.)");
+    } else {
+      showOk("Opened a shared universe. Add your own notes, expand nodes, or hit <b>New</b> to start fresh.");
+    }
     setTimeout(fitAll, 400);
     return true;
   } catch(e){ return false; }
+}
+
+/* ---------------- Read-only viewing mode ---------------- */
+function enableReadOnly(){
+  document.body.classList.add('readonly');
+  // stop expand-on-double-click and dragging stars while viewing
+  window._readOnly = true;
 }
 
 /* ---------------- Start over ---------------- */
