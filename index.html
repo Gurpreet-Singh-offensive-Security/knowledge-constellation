@@ -97,7 +97,8 @@
   .btn-row { display: flex; gap: 8px; }
   .btn-row button { margin-top: 10px; }
 
-  #graph-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+  #graph-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; touch-action: none; }
+  #graph-container svg { touch-action: none; }
   .links line { stroke: #444d56; stroke-opacity: 0.45; stroke-width: 1.5px; }
   circle.nd { cursor: pointer; transition: stroke 0.2s; }
   circle.nd:hover { stroke: #fff; stroke-width: 2px; }
@@ -110,12 +111,28 @@
   #ok .sharebox { width:100%; margin-top:8px; padding:8px; font-size:0.75rem; background:rgba(1,4,9,0.6); border:1px solid var(--line); color:#adbac7; border-radius:6px; word-break:break-all; }
   .badge { display:inline-block; font-size:0.7rem; padding:2px 8px; border-radius:20px; background:rgba(88,166,255,0.15); color:var(--accent); margin-bottom:8px; }
   .hint { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:5; font-size:0.75rem; color:#6e7681; background:rgba(10,15,30,0.6); padding:6px 14px; border-radius:20px; backdrop-filter:blur(6px); text-align:center; }
+  #suggestions { margin:4px 0 2px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .chip { font-size:0.72rem; padding:3px 9px; border-radius:14px; background:rgba(88,166,255,0.12); border:1px solid rgba(88,166,255,0.25); color:#79c0ff; cursor:pointer; transition:0.2s; }
+  .chip:hover { background:rgba(88,166,255,0.25); }
+  #saved-stamp { position:absolute; bottom:14px; left:18px; z-index:5; font-size:0.7rem; color:#6e7681; }
   #galaxy-count { position:absolute; bottom:14px; right:18px; z-index:5; font-size:0.75rem; color:#6e7681; background:rgba(10,15,30,0.6); padding:6px 12px; border-radius:20px; backdrop-filter:blur(6px); }
   #credit { position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:5; font-size:0.72rem; }
   #credit a { color:#6e7681; text-decoration:none; opacity:0.85; transition:0.2s; }
   #credit a:hover { color:#58a6ff; opacity:1; }
   a { color: var(--accent); }
   .saved-note { margin-top:12px; padding:10px; border-radius:8px; background:rgba(63,185,80,0.08); border:1px solid rgba(63,185,80,0.3); font-size:0.85rem; white-space:pre-wrap; display:none; }
+
+  /* ---- Mobile / small screens ---- */
+  @media (max-width: 768px) {
+    #ui-panel { max-height: 86vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    #ui-panel.shifted { top: 12px; left: 12px; right: 12px; width: auto; max-width: none; max-height: 60vh; }
+    #info-panel { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; max-width: none; max-height: 55vh; }
+    #credit { font-size: 0.6rem; max-width: 92vw; text-align: center; }
+    .hint { display: none; }                 /* gesture hints don't apply to touch */
+    #galaxy-count, #saved-stamp { font-size: 0.68rem; }
+    button { padding: 13px; }                 /* bigger tap targets */
+    .chip { padding: 6px 12px; font-size: 0.8rem; }
+  }
 </style>
 </head>
 <body>
@@ -124,21 +141,33 @@
   <!-- Control panel -->
   <div id="ui-panel">
     <h2>✦ Constellation Explorer</h2>
-    <p class="muted" style="margin:4px 0 8px;">Map any topic into a galaxy of stars. Each new topic becomes its own galaxy — zoom out to see them all, zoom in to explore one.</p>
+    <p class="muted" style="margin:4px 0 8px;">Map any topic into a galaxy of stars. Free with Google Gemini — or bring your own OpenAI, Claude, DeepSeek, or local Ollama key.</p>
 
-    <label>Gemini API key (free — <a href="https://aistudio.google.com/apikey" target="_blank">get one here</a>)</label>
+    <label>AI provider</label>
+    <select id="provider-select" onchange="updateProvider()">
+      <option value="gemini">Google Gemini (free)</option>
+      <option value="openai">OpenAI (GPT)</option>
+      <option value="anthropic">Anthropic (Claude)</option>
+      <option value="deepseek">DeepSeek</option>
+      <option value="ollama">Ollama (local, no key)</option>
+    </select>
+
+    <label id="key-label">Gemini API key (free — <a href="https://aistudio.google.com/apikey" target="_blank">get one here</a>)</label>
     <input type="password" id="api-key" placeholder="AIza..." />
 
     <label>Model</label>
-    <select id="model-select">
-      <option value="gemini-2.5-flash">gemini-2.5-flash (recommended, free)</option>
-      <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (fastest)</option>
-      <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-      <option value="gemini-2.5-pro">gemini-2.5-pro (deeper, may need paid)</option>
-    </select>
+    <select id="model-select"></select>
 
     <label>What do you want to learn?</label>
     <input type="text" id="topic-input" placeholder="e.g. GET /login, sepsis pathophysiology..." />
+    <div id="suggestions">
+      <span class="muted" style="font-size:0.72rem;">Try one:</span>
+      <span class="chip" onclick="trySuggestion('TCP/IP')">TCP/IP</span>
+      <span class="chip" onclick="trySuggestion('OAuth 2.0')">OAuth 2.0</span>
+      <span class="chip" onclick="trySuggestion('Photosynthesis')">Photosynthesis</span>
+      <span class="chip" onclick="trySuggestion('Machine Learning')">Machine Learning</span>
+      <span class="chip" onclick="trySuggestion('The French Revolution')">French Revolution</span>
+    </div>
 
     <button onclick="generateGraph()">→ Map Concept (new galaxy)</button>
     <div class="btn-row">
@@ -166,6 +195,7 @@
     <h2 id="info-title">Concept Node</h2>
     <p class="muted" id="info-galaxy" style="margin:-2px 0 8px;"></p>
     <p id="info-desc" style="font-size:0.92rem; line-height:1.6; color:#adbac7;"></p>
+    <button class="ghost" style="font-size:0.78rem; padding:7px;" onclick="copyExplanation(this)">⧉ Copy explanation</button>
 
     <div class="saved-note" id="saved-note"></div>
 
@@ -181,6 +211,7 @@
   <div id="graph-container"></div>
   <div class="hint">Click a star = details &nbsp;•&nbsp; Double-click = expand &nbsp;•&nbsp; Scroll = zoom &nbsp;•&nbsp; Zoom out to see all galaxies &nbsp;•&nbsp; Click a galaxy's name = rename / delete it</div>
   <div id="galaxy-count"></div>
+  <div id="saved-stamp"></div>
   <div id="credit">
     <a href="https://github.com/Gurpreet-Singh-offensive-Security/knowledge-constellation" target="_blank" rel="noopener">
       ✦ Knowledge Constellation Explorer — created by Gurpreet Singh (@Gurpreet-Singh-offensive-Security) — ⭐ Star it on GitHub
@@ -271,12 +302,89 @@ function galaxyBounds(gx){
 /* ---------------- Gemini call ---------------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+/* ---------------- AI providers (bring your own key) ----------------
+   Gemini is the free default. The others are opt-in — paste a key from
+   that provider and pick a model. All run straight from the browser
+   (no backend), so each provider must allow browser/CORS calls. */
+const PROVIDERS = {
+  gemini: {
+    name: "Google Gemini",
+    keyLabel: 'Gemini API key (free — <a href="https://aistudio.google.com/apikey" target="_blank">get one here</a>)',
+    keyPlaceholder: "AIza...",
+    models: [
+      ["gemini-2.5-flash", "gemini-2.5-flash (recommended, free)"],
+      ["gemini-2.5-flash-lite", "gemini-2.5-flash-lite (fastest)"],
+      ["gemini-2.0-flash", "gemini-2.0-flash"],
+      ["gemini-2.5-pro", "gemini-2.5-pro (deeper, may need paid)"]
+    ]
+  },
+  openai: {
+    name: "OpenAI",
+    keyLabel: 'OpenAI API key (<a href="https://platform.openai.com/api-keys" target="_blank">get one</a>)',
+    keyPlaceholder: "sk-...",
+    models: [
+      ["gpt-4o-mini", "gpt-4o-mini (cheap, fast)"],
+      ["gpt-4o", "gpt-4o"],
+      ["gpt-4.1-mini", "gpt-4.1-mini"],
+      ["gpt-4.1", "gpt-4.1"]
+    ]
+  },
+  anthropic: {
+    name: "Anthropic (Claude)",
+    keyLabel: 'Anthropic API key (<a href="https://console.anthropic.com/settings/keys" target="_blank">get one</a>)',
+    keyPlaceholder: "sk-ant-...",
+    models: [
+      ["claude-3-5-haiku-20241022", "Claude 3.5 Haiku (fast)"],
+      ["claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet"],
+      ["claude-3-7-sonnet-20250219", "Claude 3.7 Sonnet"]
+    ]
+  },
+  deepseek: {
+    name: "DeepSeek",
+    keyLabel: 'DeepSeek API key (<a href="https://platform.deepseek.com/api_keys" target="_blank">get one</a>)',
+    keyPlaceholder: "sk-...",
+    models: [
+      ["deepseek-chat", "deepseek-chat"],
+      ["deepseek-reasoner", "deepseek-reasoner"]
+    ]
+  },
+  ollama: {
+    name: "Ollama (local)",
+    keyLabel: 'No key needed — run Ollama locally (<a href="https://ollama.com" target="_blank">ollama.com</a>). Enter model name below.',
+    keyPlaceholder: "(no key needed)",
+    models: [
+      ["llama3.1", "llama3.1"],
+      ["llama3.2", "llama3.2"],
+      ["mistral", "mistral"],
+      ["qwen2.5", "qwen2.5"]
+    ]
+  }
+};
+function currentProvider(){ return document.getElementById('provider-select').value; }
+
+/* swap the key label, placeholder and model list when provider changes */
+function updateProvider(){
+  const p = currentProvider();
+  const cfg = PROVIDERS[p] || PROVIDERS.gemini;
+  document.getElementById('key-label').innerHTML = cfg.keyLabel;
+  const keyEl = document.getElementById('api-key');
+  keyEl.placeholder = cfg.keyPlaceholder;
+  keyEl.style.display = (p === 'ollama') ? 'none' : 'block';
+  const sel = document.getElementById('model-select');
+  sel.innerHTML = cfg.models.map(m => `<option value="${m[0]}">${m[1]}</option>`).join('');
+  // remember the key per-provider so switching back doesn't lose it
+  keyEl.value = localStorage.getItem('kc_key_' + p) || '';
+  localStorage.setItem('kc_provider', p);
+}
+
 /* Self-pacing: the free tier allows only a few requests per minute.
    We keep a minimum gap between calls so rapid expand/add never trips the limit. */
 let lastCallAt = 0;
 function minGapMs(){
+  // Pacing mainly matters for Gemini's free tier. Other providers / paid keys
+  // don't need big gaps, so keep it short for them.
+  if (currentProvider() !== 'gemini') return 600;
   const model = document.getElementById('model-select').value;
-  // lite model has higher limits -> shorter gap; others get a safer gap
   return /lite/.test(model) ? 4500 : 6500;
 }
 async function paceRequests(){
@@ -314,63 +422,114 @@ function parseRetrySeconds(text){
   return null;
 }
 
-async function callGemini(prompt){
+/* build the right request (url, headers, body) for the chosen provider */
+function buildRequest(provider, model, apiKey, prompt){
+  if (provider === 'gemini'){
+    return {
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json", temperature: 0.4 }
+      })
+    };
+  }
+  if (provider === 'openai' || provider === 'deepseek'){
+    return {
+      url: provider === 'openai'
+        ? 'https://api.openai.com/v1/chat/completions'
+        : 'https://api.deepseek.com/chat/completions',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.4,
+        response_format: { type: 'json_object' }
+      })
+    };
+  }
+  if (provider === 'anthropic'){
+    return {
+      url: 'https://api.anthropic.com/v1/messages',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model, max_tokens: 4096, temperature: 0.4,
+        messages: [{ role: 'user', content: prompt + "\n\nRespond with ONLY raw JSON." }]
+      })
+    };
+  }
+  if (provider === 'ollama'){
+    return {
+      url: 'http://localhost:11434/api/generate',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, prompt, stream: false, format: 'json' })
+    };
+  }
+}
+
+/* pull the text answer out of each provider's response shape */
+function extractText(provider, data){
+  if (provider === 'gemini')    return data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (provider === 'openai' || provider === 'deepseek') return data?.choices?.[0]?.message?.content;
+  if (provider === 'anthropic') return data?.content?.[0]?.text;
+  if (provider === 'ollama')    return data?.response;
+  return null;
+}
+
+async function callAI(prompt){
+  const provider = currentProvider();
   const apiKey = document.getElementById('api-key').value.trim();
   const model  = document.getElementById('model-select').value;
-  if (!apiKey) throw new Error("NO_KEY");
+  if (provider !== 'ollama' && !apiKey) throw new Error("NO_KEY");
 
-  await paceRequests();   // self-throttle before every call
+  await paceRequests();   // self-throttle (mainly for Gemini free tier)
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const body = JSON.stringify({
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { responseMimeType: "application/json", temperature: 0.4 }
-  });
+  const req = buildRequest(provider, model, apiKey, prompt);
 
-  // Google's servers throw transient 503 (overloaded) / 500 / 429 (rate limit) errors.
-  // These are NOT bugs — we wait the right amount and retry.
+  // Servers can throw transient 503 / 500 / 429 errors — wait and retry.
   const maxAttempts = 5;
   let lastErr = "";
   for (let attempt = 1; attempt <= maxAttempts; attempt++){
     let res;
     try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body
-      });
+      res = await fetch(req.url, { method:'POST', headers:req.headers, body:req.body });
     } catch(networkErr){
       lastErr = "NETWORK";
       if (attempt < maxAttempts){ setRetryMsg(attempt, maxAttempts); await sleep(800 * 2**(attempt-1)); continue; }
-      throw new Error("NETWORK");
+      // Ollama running but unreachable, or a provider blocking browser calls
+      throw new Error(provider === 'ollama' ? "OLLAMA_OFF" : "NETWORK");
     }
 
     if (res.ok){
       lastCallAt = Date.now();
       const data = await res.json();
-      let text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      let text = extractText(provider, data);
       if (!text) throw new Error("EMPTY");
       text = text.replace(/```json/gi,'').replace(/```/g,'').trim();
       return JSON.parse(text);
     }
 
     const t = await res.text();
-    if (res.status === 400 && /API key not valid/i.test(t)) throw new Error("BAD_KEY");
+    if ((res.status === 401 || res.status === 403) || (res.status === 400 && /API key not valid/i.test(t))) throw new Error("BAD_KEY");
     if (res.status === 404) throw new Error("BAD_MODEL");
 
     if (res.status === 429){
-      // rate limit: wait the time Google suggests (or ~35s), then retry
       lastErr = "RATE_LIMIT";
       if (attempt < maxAttempts){
         const secs = parseRetrySeconds(t) || 35;
-        await countdown((secs+1)*1000, "Free-tier limit reached — auto-resuming in");
+        await countdown((secs+1)*1000, "Rate limit reached — auto-resuming in");
         lastCallAt = Date.now();
         continue;
       }
       throw new Error("RATE_LIMIT");
     }
 
-    if (res.status === 503 || res.status === 500){
+    if (res.status === 503 || res.status === 500 || res.status === 529){
       lastErr = "OVERLOADED";
       if (attempt < maxAttempts){
         setRetryMsg(attempt, maxAttempts);
@@ -385,6 +544,9 @@ async function callGemini(prompt){
   throw new Error(lastErr || "OVERLOADED");
 }
 
+/* keep old name working */
+const callGemini = callAI;
+
 function setRetryMsg(attempt, max){
   const el = document.getElementById('loading');
   el.style.display = 'block';
@@ -392,13 +554,18 @@ function setRetryMsg(attempt, max){
 }
 
 function explainError(err){
+  const p = (typeof currentProvider === 'function') ? currentProvider() : 'gemini';
+  const pName = (PROVIDERS[p] && PROVIDERS[p].name) || 'the provider';
   switch(err.message){
-    case "NO_KEY":     return "Please enter your free Gemini API key first. <a href='https://aistudio.google.com/apikey' target='_blank'>Get one</a>.";
-    case "BAD_KEY":    return "That API key was rejected. Copy it again from <a href='https://aistudio.google.com/apikey' target='_blank'>Google AI Studio</a>.";
-    case "BAD_MODEL":  return "That model isn't available on your key. Try <b>gemini-2.5-flash</b> in the Model dropdown.";
-    case "RATE_LIMIT": return "Still hitting the free-tier limit after waiting. The free key allows only a few requests per minute. Options: wait a minute and retry, switch to <b>gemini-2.5-flash-lite</b> (higher limits), or use a paid API key (limits basically disappear).";
-    case "OVERLOADED": return "Google's servers are overloaded right now (their side, not yours). I already retried a few times. Wait a moment and try again — or switch model in the dropdown.";
-    case "NETWORK":    return "Couldn't reach Google — check your internet connection and try again.";
+    case "NO_KEY":     return `Please enter your ${pName} API key first.`;
+    case "BAD_KEY":    return `That ${pName} API key was rejected. Double-check you copied the right key for the selected provider.`;
+    case "BAD_MODEL":  return "That model isn't available on your key/plan. Pick a different model in the dropdown.";
+    case "RATE_LIMIT": return p === 'gemini'
+        ? "Still hitting the free-tier limit after waiting. The free key allows only a few requests per minute. Options: wait a minute, switch to <b>gemini-2.5-flash-lite</b>, or use a paid key."
+        : "Rate limit reached on your plan. Wait a moment and try again.";
+    case "OVERLOADED": return `${pName}'s servers are busy right now (their side, not yours). I retried a few times — wait a moment and try again, or switch model.`;
+    case "OLLAMA_OFF": return "Couldn't reach Ollama. Make sure it's running locally (<code>ollama serve</code>) and you've pulled the model. Note: browsers may block localhost from a hosted page — running this file locally works best for Ollama.";
+    case "NETWORK":    return `Couldn't reach ${pName}. Check your internet — or this provider may not allow direct browser calls. Try Gemini, which always works here.`;
     case "EMPTY":      return "The model returned nothing (possibly a safety block). Try rewording the topic.";
     default:
       if (err instanceof SyntaxError) return "The AI returned text that wasn't clean JSON. Just hit the button again — it usually works on the next try.";
@@ -467,6 +634,7 @@ Every id must be unique. Every link source/target must match an existing node id
     if (!data.nodes || !data.links) throw new Error("Bad shape");
     addGalaxy(data, topic);
     autoSave();
+    hideSuggestions();
     document.getElementById('topic-input').value = "";
     showOk(`Added <b>"${topic}"</b> as a new galaxy. Type another topic to add more — or hit <b>See all galaxies</b> to view your whole universe.`);
   } catch(err){
@@ -795,7 +963,35 @@ function loadSnapshot(snap){
 
 function autoSave(){
   if (!galaxies.length) return;
-  try { localStorage.setItem("kc_saved", JSON.stringify(snapshot())); } catch(e){}
+  try { localStorage.setItem("kc_saved", JSON.stringify(snapshot())); localStorage.setItem("kc_saved_at", Date.now()); } catch(e){}
+  updateSavedStamp();
+}
+function updateSavedStamp(){
+  const el = document.getElementById('saved-stamp');
+  if (!el) return;
+  const ts = Number(localStorage.getItem("kc_saved_at"));
+  if (!ts || !galaxies.length){ el.innerText = ""; return; }
+  const t = new Date(ts);
+  el.innerText = "Saved " + t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+/* suggested-topic chips */
+function trySuggestion(topic){
+  document.getElementById('topic-input').value = topic;
+  generateGraph();
+}
+function hideSuggestions(){
+  const s = document.getElementById('suggestions');
+  if (s) s.style.display = 'none';
+}
+
+/* copy a node's explanation to clipboard */
+function copyExplanation(btn){
+  const text = (selectedNode && selectedNode.description) ? selectedNode.description : document.getElementById('info-desc').innerText;
+  navigator.clipboard?.writeText(text).then(
+    ()=>{ const o=btn.innerText; btn.innerText="Copied ✓"; setTimeout(()=>btn.innerText=o,1500); },
+    ()=>{ btn.innerText="Press Ctrl/Cmd+C"; }
+  );
 }
 function saveConstellation(){
   if (!galaxies.length){ showErr("Nothing to save yet — map a topic first."); return; }
@@ -871,11 +1067,13 @@ function startOver(){
   closeInfo();
   document.getElementById('topic-input').value = "";
   document.getElementById('ui-panel').classList.remove('shifted');
-  localStorage.removeItem("kc_saved");
+  localStorage.removeItem("kc_saved"); localStorage.removeItem("kc_saved_at");
   if (location.hash) history.replaceState(null,"",location.pathname);
   svg.call(zoom.transform, d3.zoomIdentity);
   currentK = 1;
   updateCount();
+  updateSavedStamp();
+  const s = document.getElementById('suggestions'); if (s) s.style.display = 'flex';
   hideErr();
   showWelcome();
 }
@@ -934,16 +1132,33 @@ function galaxyDrag(){
 
 /* persist key locally so you don't retype it */
 const keyInput = document.getElementById('api-key');
-keyInput.value = localStorage.getItem('kc_key') || '';
-keyInput.addEventListener('change', ()=>localStorage.setItem('kc_key', keyInput.value.trim()));
+// restore last-used provider, then its saved key + model list
+(function restoreProvider(){
+  const savedProvider = localStorage.getItem('kc_provider') || 'gemini';
+  document.getElementById('provider-select').value = savedProvider;
+  updateProvider();   // fills model list, key label, and loads that provider's key
+  // migrate old single key into the gemini slot if present
+  if (savedProvider === 'gemini' && !keyInput.value && localStorage.getItem('kc_key')){
+    keyInput.value = localStorage.getItem('kc_key');
+  }
+})();
+keyInput.addEventListener('change', ()=>{
+  localStorage.setItem('kc_key_' + currentProvider(), keyInput.value.trim());
+  if (currentProvider() === 'gemini') localStorage.setItem('kc_key', keyInput.value.trim()); // back-compat
+});
 document.getElementById('topic-input').addEventListener('keydown', e=>{ if(e.key==='Enter') generateGraph(); });
+
+/* Esc closes the node detail panel */
+document.addEventListener('keydown', e=>{
+  if (e.key === 'Escape' && document.getElementById('info-panel').style.display === 'block') closeInfo();
+});
 
 /* ---------------- Startup ---------------- */
 (function init(){
-  if (loadFromHash()) return;            // opened a shared link
+  if (loadFromHash()){ hideSuggestions(); return; }   // opened a shared link
   const raw = localStorage.getItem("kc_saved");
   if (raw){                              // bring back the last universe
-    try { loadSnapshot(JSON.parse(raw)); document.getElementById('ui-panel').classList.add('shifted'); setTimeout(fitAll,500); return; } catch(e){}
+    try { loadSnapshot(JSON.parse(raw)); document.getElementById('ui-panel').classList.add('shifted'); hideSuggestions(); updateSavedStamp(); setTimeout(fitAll,500); return; } catch(e){}
   }
   if (!localStorage.getItem('kc_seen')){ // first-ever visit
     localStorage.setItem('kc_seen','1');
