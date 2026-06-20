@@ -13,14 +13,71 @@
      (a) the running application's user interface (e.g. a footer credit), and
      (b) the project's README / documentation.
    This credit may not be removed, hidden, or obscured. See the LICENSE file.
+
+   ---------------------------------------------------------------------------
+   SECURITY HARDENING PASS — changes summary (kept at top so they're easy to
+   diff/review later):
+     1. XSS: all untrusted strings (node id/description, galaxy topic, notes)
+        now go through escapeHtml()/textContent before hitting the DOM.
+     2. API keys: still localStorage (by design, for convenience across
+        sessions), but a "Clear stored key" control was added, plus an
+        explicit on-screen warning. Since (1) closes the only injection path
+        in this app, the key can no longer be read by injected script via
+        this app's own bugs.
+     3. CSP added via <meta> tag, scoped to only what this app needs:
+        d3 CDN, the AI provider APIs, and localhost (Ollama).
+     4. Subresource Integrity (SRI) added to the D3 CDN <script> tag, plus
+        crossorigin attribute.
+     5. Defensive shape-checking added to JSON.parse() results before they're
+        used (loadSnapshot / drop / hash load) so malformed/adversarial files
+        can't crash rendering or smuggle unexpected fields.
+     6. Provider calls: kept fully client-side per product decision. Added a
+        clearer one-time risk notice instead of changing architecture.
+     7. Ollama localhost call: added a code comment + one-line UI note
+        explaining this depends on the visitor's local Ollama CORS settings.
+     8. Share-link hash: now validated for shape (not just length) before
+        being parsed into the live graph.
+     9. Old/new key migration: legacy unscoped 'kc_key' is migrated into
+        'kc_key_gemini' once, then deleted, instead of being kept around
+        indefinitely alongside the new scoped key.
+   ---------------------------------------------------------------------------
   ============================================================================
 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!--
+  CSP: locked down to only what this app actually needs.
+  - default-src 'none': deny everything unless explicitly allowed below.
+  - script-src: this page's own inline scripts (the app is single-file by
+    design) + the D3 CDN. 'unsafe-inline' is required because the app ships
+    as one portable .html file with inline <script>; this is a deliberate
+    trade-off for portability, not an oversight. XSS risk from that is
+    mitigated separately by escaping all untrusted data before DOM insertion.
+  - connect-src: the AI provider endpoints this app calls, plus localhost
+    for Ollama.
+  - img-src/style-src: 'self' + inline (small app, no external assets).
+-->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'self' 'unsafe-inline' https://d3js.org;
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data:;
+  font-src 'self';
+  connect-src 'self'
+    https://generativelanguage.googleapis.com
+    https://api.openai.com
+    https://api.anthropic.com
+    https://api.deepseek.com
+    http://localhost:11434;
+  base-uri 'none';
+  form-action 'none';
+">
 <title>Knowledge Constellation Explorer</title>
-<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"
+        integrity="sha384-/y2nRSeRR3GMS9hwoUf/qHHaUq9KjJSKwlhrxsTaiQ2HBVNn0FoH9DXa4uOItmJL"
+        crossorigin="anonymous"></script>
 <!-- LZ-String (MIT, by pieroxy: github.com/pieroxy/lz-string) — inlined so the app stays self-contained. Used to compress share links. -->
 <script>
 var LZString=(function(){
@@ -260,6 +317,10 @@ var LZString=(function(){
   a { color: var(--accent); }
   .saved-note { margin-top:12px; padding:10px; border-radius:8px; background:rgba(63,185,80,0.08); border:1px solid rgba(63,185,80,0.3); font-size:0.85rem; white-space:pre-wrap; display:none; }
 
+  /* key-safety notice + clear-key control */
+  .key-warning { margin-top:6px; padding:8px 10px; border-radius:8px; background:rgba(210,153,34,0.1); border:1px solid rgba(210,153,34,0.35); color:#d29922; font-size:0.72rem; line-height:1.5; }
+  #clear-key-btn { margin-top:6px; }
+
   /* ---- Search across the universe (lives inside the control panel) ---- */
   #search-box {
     width:100%; padding:10px 13px; border-radius:8px; margin-top:8px;
@@ -293,7 +354,8 @@ var LZString=(function(){
   body.readonly #note-input, body.readonly button[onclick="saveNote()"],
   body.readonly button[onclick="expandNode()"],
   body.readonly button[onclick="deleteCurrentGalaxy()"],
-  body.readonly #info-panel label { display: none !important; }
+  body.readonly #info-panel label,
+  body.readonly .key-warning, body.readonly #clear-key-btn { display: none !important; }
   body.readonly #ui-panel h2::after { content: " · view only"; font-size: 0.7rem; color:#8b949e; font-weight:400; }
 
   /* ---- Mobile / small screens ---- */
@@ -327,8 +389,12 @@ var LZString=(function(){
       <option value="ollama">Ollama (local, no key)</option>
     </select>
 
-    <label id="key-label">Gemini API key (free — <a href="https://aistudio.google.com/apikey" target="_blank">get one here</a>)</label>
-    <input type="password" id="api-key" placeholder="AIza..." />
+    <label id="key-label">Gemini API key (free — <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">get one here</a>)</label>
+    <input type="password" id="api-key" placeholder="AIza..." autocomplete="off" />
+    <div class="key-warning" id="key-warning">
+      ⚠ Your key is stored only in <b>this browser's local storage</b> (never sent anywhere but the provider you pick). Don't use this on a shared/public computer. You can wipe it any time below.
+    </div>
+    <button class="ghost" id="clear-key-btn" onclick="clearStoredKey()">🗑 Clear stored key (this provider)</button>
 
     <label>Model</label>
     <select id="model-select"></select>
@@ -398,12 +464,29 @@ var LZString=(function(){
   <div id="galaxy-count"></div>
   <div id="saved-stamp"></div>
   <div id="credit">
-    <a href="https://github.com/Gurpreet-Singh-offensive-Security/knowledge-constellation" target="_blank" rel="noopener">
+    <a href="https://github.com/Gurpreet-Singh-offensive-Security/knowledge-constellation" target="_blank" rel="noopener noreferrer">
       ✦ Knowledge Constellation Explorer — created by Gurpreet Singh (@Gurpreet-Singh-offensive-Security) — ⭐ Star it on GitHub
     </a>
   </div>
 
 <script>
+/* ==========================================================================
+   SECURITY: shared escaping helper. ALL untrusted strings — node id,
+   description, galaxy topic, user notes — must go through this (or
+   .textContent) before they touch the DOM via innerHTML. This is the single
+   choke point that closes the stored-XSS hole from loaded/shared JSON.
+   ========================================================================== */
+function escapeHtml(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[c]));
+}
+/* Same idea, but for safe insertion inside an HTML attribute value
+   (e.g. value="...") — also escapes newlines so attributes can't break. */
+function escapeAttr(s){
+  return escapeHtml(s).replace(/\n/g, '&#10;').replace(/\r/g, '');
+}
+
 /* ---------------- Background stars ---------------- */
 (function generateBackgroundStars(){
   const c = document.getElementById('star-container');
@@ -444,6 +527,11 @@ const zoom = d3.zoom().scaleExtent([0.04,4]).on("zoom", e => {
 svg.call(zoom).on("dblclick.zoom", null);   // keep dbl-click for "expand", not zoom
 
 /* ---------------- Helpers ---------------- */
+/* SECURITY: showErr/showOk render via innerHTML because several call sites
+   intentionally pass small trusted HTML snippets (bold tags, buttons,
+   inline styles for the share box). Any *user/AI-controlled* string passed
+   into these MUST be escaped by the caller first (see callers below: topic
+   names, node ids and share links are all escaped before reaching here). */
 function showErr(msg){ const e=document.getElementById('err'); e.style.display='block'; e.innerHTML=msg; hideOk(); }
 function hideErr(){ document.getElementById('err').style.display='none'; }
 function showOk(msg){ const e=document.getElementById('ok'); e.style.display='block'; e.innerHTML=msg; hideErr(); }
@@ -490,11 +578,24 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 /* ---------------- AI providers (bring your own key) ----------------
    Gemini is the free default. The others are opt-in — paste a key from
    that provider and pick a model. All run straight from the browser
-   (no backend), so each provider must allow browser/CORS calls. */
+   (no backend), so each provider must allow browser/CORS calls.
+
+   SECURITY NOTE (kept deliberately, per product decision): these calls go
+   directly from the browser to the provider using a raw, full-privilege
+   API key, including Anthropic's explicit
+   'anthropic-dangerous-direct-browser-access' opt-in header. This is a
+   conscious trade-off for a zero-backend, fully portable single-file app.
+   Risk is mitigated by: (a) keys never leaving the browser except to the
+   provider itself, (b) the on-screen key warning + clear-key control,
+   and (c) the CSP's connect-src allowlist, which prevents this page's
+   script from ever sending the key anywhere other than these four
+   providers + localhost. For anything beyond personal/local use, a
+   small server-side proxy that holds the key instead is the safer
+   pattern — see the README. */
 const PROVIDERS = {
   gemini: {
     name: "Google Gemini",
-    keyLabel: 'Gemini API key (free — <a href="https://aistudio.google.com/apikey" target="_blank">get one here</a>)',
+    keyLabel: 'Gemini API key (free — <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">get one here</a>)',
     keyPlaceholder: "AIza...",
     models: [
       ["gemini-2.5-flash", "gemini-2.5-flash (recommended, free)"],
@@ -505,7 +606,7 @@ const PROVIDERS = {
   },
   openai: {
     name: "OpenAI",
-    keyLabel: 'OpenAI API key (<a href="https://platform.openai.com/api-keys" target="_blank">get one</a>)',
+    keyLabel: 'OpenAI API key (<a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">get one</a>)',
     keyPlaceholder: "sk-...",
     models: [
       ["gpt-4o-mini", "gpt-4o-mini (cheap, fast)"],
@@ -516,7 +617,7 @@ const PROVIDERS = {
   },
   anthropic: {
     name: "Anthropic (Claude)",
-    keyLabel: 'Anthropic API key (<a href="https://console.anthropic.com/settings/keys" target="_blank">get one</a>)',
+    keyLabel: 'Anthropic API key (<a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">get one</a>)',
     keyPlaceholder: "sk-ant-...",
     models: [
       ["claude-3-5-haiku-20241022", "Claude 3.5 Haiku (fast)"],
@@ -526,7 +627,7 @@ const PROVIDERS = {
   },
   deepseek: {
     name: "DeepSeek",
-    keyLabel: 'DeepSeek API key (<a href="https://platform.deepseek.com/api_keys" target="_blank">get one</a>)',
+    keyLabel: 'DeepSeek API key (<a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer">get one</a>)',
     keyPlaceholder: "sk-...",
     models: [
       ["deepseek-chat", "deepseek-chat"],
@@ -535,7 +636,13 @@ const PROVIDERS = {
   },
   ollama: {
     name: "Ollama (local)",
-    keyLabel: 'No key needed — run Ollama locally (<a href="https://ollama.com" target="_blank">ollama.com</a>). Enter model name below.',
+    /* SECURITY NOTE: this calls http://localhost:11434 directly from
+       whatever origin hosts this page (e.g. GitHub Pages). Whether the
+       browser allows that call is entirely up to the visitor's local
+       Ollama CORS configuration — this app has no control over it and
+       cannot make that call any safer from the page side. Running this
+       file locally (file://) avoids the cross-origin question entirely. */
+    keyLabel: 'No key needed — run Ollama locally (<a href="https://ollama.com" target="_blank" rel="noopener noreferrer">ollama.com</a>). Enter model name below. Note: calling localhost from a hosted page depends on your local Ollama CORS settings.',
     keyPlaceholder: "(no key needed)",
     models: [
       ["llama3.1", "llama3.1"],
@@ -551,16 +658,34 @@ function currentProvider(){ return document.getElementById('provider-select').va
 function updateProvider(){
   const p = currentProvider();
   const cfg = PROVIDERS[p] || PROVIDERS.gemini;
-  document.getElementById('key-label').innerHTML = cfg.keyLabel;
+  document.getElementById('key-label').innerHTML = cfg.keyLabel; // trusted: built-in constant strings only, never user input
   const keyEl = document.getElementById('api-key');
   keyEl.placeholder = cfg.keyPlaceholder;
   keyEl.style.display = (p === 'ollama') ? 'none' : 'block';
+  document.getElementById('key-warning').style.display = (p === 'ollama') ? 'none' : 'block';
+  document.getElementById('clear-key-btn').style.display = (p === 'ollama') ? 'none' : 'block';
   const sel = document.getElementById('model-select');
-  sel.innerHTML = cfg.models.map(m => `<option value="${m[0]}">${m[1]}</option>`).join('');
+  sel.innerHTML = cfg.models.map(m => `<option value="${escapeAttr(m[0])}">${escapeHtml(m[1])}</option>`).join(''); // built-in constants, escaped defensively anyway
   // remember the key per-provider so switching back doesn't lose it
-  keyEl.value = localStorage.getItem('kc_key_' + p) || '';
-  localStorage.setItem('kc_provider', p);
+  keyEl.value = safeLocalGet('kc_key_' + p) || '';
+  safeLocalSet('kc_provider', p);
 }
+
+/* clear the currently-selected provider's stored key, from both the input and localStorage */
+function clearStoredKey(){
+  const p = currentProvider();
+  const keyEl = document.getElementById('api-key');
+  keyEl.value = '';
+  try { localStorage.removeItem('kc_key_' + p); } catch(e){}
+  if (p === 'gemini'){ try { localStorage.removeItem('kc_key'); } catch(e){} }
+  showOk(`Cleared the stored ${escapeHtml((PROVIDERS[p]||{}).name || p)} key from this browser.`);
+}
+
+/* localStorage can throw (private mode, storage disabled, quota) — wrap it
+   everywhere it's touched so a storage failure never crashes the app. */
+function safeLocalGet(key){ try { return localStorage.getItem(key); } catch(e){ return null; } }
+function safeLocalSet(key, val){ try { localStorage.setItem(key, val); return true; } catch(e){ return false; } }
+function safeLocalRemove(key){ try { localStorage.removeItem(key); } catch(e){} }
 
 /* Self-pacing: the free tier allows only a few requests per minute.
    We keep a minimum gap between calls so rapid expand/add never trips the limit. */
@@ -611,7 +736,7 @@ function parseRetrySeconds(text){
 function buildRequest(provider, model, apiKey, prompt){
   if (provider === 'gemini'){
     return {
-      url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      url: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
@@ -696,7 +821,9 @@ async function callAI(prompt){
       let text = extractText(provider, data);
       if (!text) throw new Error("EMPTY");
       text = text.replace(/```json/gi,'').replace(/```/g,'').trim();
-      return JSON.parse(text);
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== 'object') throw new Error("EMPTY");
+      return parsed;
     }
 
     const t = await res.text();
@@ -742,29 +869,87 @@ function explainError(err){
   const p = (typeof currentProvider === 'function') ? currentProvider() : 'gemini';
   const pName = (PROVIDERS[p] && PROVIDERS[p].name) || 'the provider';
   switch(err.message){
-    case "NO_KEY":     return `Please enter your ${pName} API key first.`;
-    case "BAD_KEY":    return `That ${pName} API key was rejected. Double-check you copied the right key for the selected provider.`;
+    case "NO_KEY":     return `Please enter your ${escapeHtml(pName)} API key first.`;
+    case "BAD_KEY":    return `That ${escapeHtml(pName)} API key was rejected. Double-check you copied the right key for the selected provider.`;
     case "BAD_MODEL":  return "That model isn't available on your key/plan. Pick a different model in the dropdown.";
     case "RATE_LIMIT": return p === 'gemini'
         ? "Still hitting the free-tier limit after waiting. The free key allows only a few requests per minute. Options: wait a minute, switch to <b>gemini-2.5-flash-lite</b>, or use a paid key."
         : "Rate limit reached on your plan. Wait a moment and try again.";
-    case "OVERLOADED": return `${pName}'s servers are busy right now (their side, not yours). I retried a few times — wait a moment and try again, or switch model.`;
+    case "OVERLOADED": return `${escapeHtml(pName)}'s servers are busy right now (their side, not yours). I retried a few times — wait a moment and try again, or switch model.`;
     case "OLLAMA_OFF": return "Couldn't reach Ollama. Make sure it's running locally (<code>ollama serve</code>) and you've pulled the model. Note: browsers may block localhost from a hosted page — running this file locally works best for Ollama.";
-    case "NETWORK":    return `Couldn't reach ${pName}. Check your internet — or this provider may not allow direct browser calls. Try Gemini, which always works here.`;
+    case "NETWORK":    return `Couldn't reach ${escapeHtml(pName)}. Check your internet — or this provider may not allow direct browser calls. Try Gemini, which always works here.`;
     case "EMPTY":      return "The model returned nothing (possibly a safety block). Try rewording the topic.";
     default:
       if (err instanceof SyntaxError) return "The AI returned text that wasn't clean JSON. Just hit the button again — it usually works on the next try.";
-      return "Something went wrong: " + err.message;
+      return "Something went wrong: " + escapeHtml(err.message);
   }
+}
+
+/* ---------------- Defensive validation for AI / file / link data ----------------
+   SECURITY: every external JSON blob (AI response, dropped file, loaded
+   localStorage snapshot, decompressed share link) is funneled through these
+   before being merged into the live graph. This stops malformed or
+   adversarial payloads from injecting unexpected fields/types or crashing
+   the renderer. Strings are NOT html-escaped here (that happens at render
+   time via escapeHtml/textContent) — this layer only enforces *shape*. */
+function asStr(v, max){
+  if (typeof v !== 'string') v = (v == null) ? '' : String(v);
+  return max ? v.slice(0, max) : v;
+}
+function asNum(v, fallback){
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+function sanitizeNodesData(rawNodes){
+  if (!Array.isArray(rawNodes)) return [];
+  const out = [];
+  for (const n of rawNodes){
+    if (!n || typeof n !== 'object') continue;
+    const id = asStr(n.id, 300).trim();
+    if (!id) continue;
+    out.push({
+      id,
+      group: [1,2,3].includes(Number(n.group)) ? Number(n.group) : 3,
+      description: asStr(n.description, 4000),
+      note: asStr(n.note, 4000),
+      x: ('x' in n) ? asNum(n.x, undefined) : undefined,
+      y: ('y' in n) ? asNum(n.y, undefined) : undefined
+    });
+  }
+  return out;
+}
+function sanitizeLinksData(rawLinks){
+  if (!Array.isArray(rawLinks)) return [];
+  const out = [];
+  for (const l of rawLinks){
+    if (!l || typeof l !== 'object') continue;
+    const s = typeof l.source === 'object' ? asStr(l.source?.id, 300) : asStr(l.source, 300);
+    const t = typeof l.target === 'object' ? asStr(l.target?.id, 300) : asStr(l.target, 300);
+    if (!s || !t) continue;
+    out.push({ source: s, target: t });
+  }
+  return out;
+}
+function sanitizeGalaxyData(gd){
+  if (!gd || typeof gd !== 'object') return null;
+  return {
+    topic: asStr(gd.topic, 200).trim() || 'Untitled',
+    cx: ('cx' in gd) ? asNum(gd.cx, undefined) : undefined,
+    cy: ('cy' in gd) ? asNum(gd.cy, undefined) : undefined,
+    nodes: sanitizeNodesData(gd.nodes),
+    links: sanitizeLinksData(gd.links)
+  };
 }
 
 /* ---------------- Build a galaxy from AI data ---------------- */
 function addGalaxy(data, topic){
   const seq = galaxySeq++;
   const center = galaxyCenter(galaxies.length);
-  const gx = { seq, topic: topic || data.topic || ("Topic " + (galaxies.length+1)), center, nodes: [], links: [], central: null };
+  const cleanNodes = sanitizeNodesData(data.nodes);
+  const cleanLinks = sanitizeLinksData(data.links);
+  const gx = { seq, topic: asStr(topic || data.topic || ("Topic " + (galaxies.length+1)), 200), center, nodes: [], links: [], central: null };
   const idMap = new Map();
-  (data.nodes||[]).forEach(n => {
+  cleanNodes.forEach(n => {
     const nd = { ...n, uid: seq + "::" + n.id, g: gx,
       x: center.x + (Math.random()-0.5)*140,
       y: center.y + (Math.random()-0.5)*140 };
@@ -773,10 +958,8 @@ function addGalaxy(data, topic){
     if (nd.group === 1 && !gx.central) gx.central = nd;
   });
   if (!gx.central && gx.nodes.length) gx.central = gx.nodes[0];
-  (data.links||[]).forEach(l => {
-    const s = typeof l.source==='object'?l.source.id:l.source;
-    const t = typeof l.target==='object'?l.target.id:l.target;
-    if (idMap.has(s) && idMap.has(t)) gx.links.push({ source: idMap.get(s).uid, target: idMap.get(t).uid });
+  cleanLinks.forEach(l => {
+    if (idMap.has(l.source) && idMap.has(l.target)) gx.links.push({ source: idMap.get(l.source).uid, target: idMap.get(l.target).uid });
   });
   galaxies.push(gx);
   mergeNotes();
@@ -822,7 +1005,7 @@ Every id must be unique. Every link source/target must match an existing node id
     hideSuggestions();
     document.getElementById('topic-input').value = "";
     if (isMobile()) collapsePanel();   // on phones, get the panel out of the way so the galaxy shows
-    showOk(`Added <b>"${topic}"</b> as a new galaxy. Type another topic to add more — or hit <b>See all galaxies</b> to view your whole universe.`);
+    showOk(`Added <b>"${escapeHtml(topic)}"</b> as a new galaxy. Type another topic to add more — or hit <b>See all galaxies</b> to view your whole universe.`);
   } catch(err){
     console.error(err);
     showErr(explainError(err));
@@ -851,9 +1034,11 @@ Return ONLY valid JSON (no markdown):
 }`;
   try {
     const data = await callGemini(prompt);
+    const cleanNodes = sanitizeNodesData(data.nodes);
+    const cleanLinks = sanitizeLinksData(data.links);
     const existing = new Set(gx.nodes.map(n => n.id));
     const idMap = new Map(gx.nodes.map(n => [n.id, n]));
-    (data.nodes||[]).forEach(n => {
+    cleanNodes.forEach(n => {
       if (!existing.has(n.id)){
         const nd = { ...n, uid: gx.seq + "::" + n.id, g: gx,
           x: parent.x + (Math.random()-0.5)*70,
@@ -861,10 +1046,8 @@ Return ONLY valid JSON (no markdown):
         gx.nodes.push(nd); existing.add(n.id); idMap.set(n.id, nd);
       }
     });
-    (data.links||[]).forEach(l => {
-      const s = typeof l.source==='object'?l.source.id:l.source;
-      const t = typeof l.target==='object'?l.target.id:l.target;
-      if (idMap.has(s) && idMap.has(t)) gx.links.push({ source: idMap.get(s).uid, target: idMap.get(t).uid });
+    cleanLinks.forEach(l => {
+      if (idMap.has(l.source) && idMap.has(l.target)) gx.links.push({ source: idMap.get(l.source).uid, target: idMap.get(l.target).uid });
     });
     mergeNotes();
     rebuild();
@@ -905,7 +1088,9 @@ function render(){
       .attr("r", d=>radiusFor(d.group))
       .attr("fill", d=>colorFor(d.group));
 
-  // node labels
+  // node labels — SECURITY: use D3's .text() (sets textContent, not
+  // innerHTML), so this is already safe against XSS regardless of what's
+  // in the AI-/file-/link-provided node id.
   labels = g.selectAll("text.node-label").data(allNodes, d => d.uid);
   labels.exit().remove();
   labels = labels.enter().append("text").attr("class","node-label").attr("dy",4)
@@ -913,6 +1098,7 @@ function render(){
       .text(d=>d.id).attr("dx", d=>radiusFor(d.group)+6);
 
   // galaxy titles — DRAG a title to move the whole galaxy; a click (no drag) opens its menu
+  // SECURITY: .text() again — safe against XSS for the same reason as labels above.
   titles = g.selectAll("text.galaxy-title").data(galaxies, d => d.seq);
   titles.exit().remove();
   titles = titles.enter().append("text").attr("class","galaxy-title")
@@ -1004,6 +1190,7 @@ function runSearch(q){
   });
   const hits = searchHits.slice(0, 40);
   if (!hits.length){ box.innerHTML = '<div class="sr-empty">No matches across your galaxies.</div>'; box.classList.add('show'); return; }
+  // SECURITY: node id / galaxy topic are AI-/file-/link-controlled strings — escaped here before innerHTML.
   box.innerHTML = hits.map((n,i)=>(
     `<div class="sr-item" data-i="${i}" onclick="gotoSearchHit(${i})">`+
       `<div class="sr-title">${escapeHtml(n.id)}</div>`+
@@ -1043,7 +1230,6 @@ function closeSearch(){
   box.classList.remove('show'); box.innerHTML='';
   document.getElementById('search-box').blur();
 }
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 /* click a galaxy's title -> small menu to focus, rename or delete it */
 function openGalaxyMenu(gx){
@@ -1064,7 +1250,7 @@ function openGalaxyMenu(gx){
 function renameGalaxy(gx){
   const name = prompt("New name for this galaxy:", gx.topic);
   if (name === null) return;
-  gx.topic = name.trim() || gx.topic;
+  gx.topic = asStr(name.trim() || gx.topic, 200);
   render(); autoSave();
 }
 
@@ -1083,9 +1269,9 @@ function deleteGalaxy(gx){
   lastDeleted = galaxyToData(gx);
   // drop its saved notes too
   try {
-    const all = JSON.parse(localStorage.getItem("kc_notes") || "{}");
+    const all = JSON.parse(safeLocalGet("kc_notes") || "{}");
     gx.nodes.forEach(n => { delete all[n.uid]; });
-    localStorage.setItem("kc_notes", JSON.stringify(all));
+    safeLocalSet("kc_notes", JSON.stringify(all));
   } catch(e){}
   // if the open info panel belonged to this galaxy, close it
   if (selectedNode && selectedNode.g === gx){ selectedNode = null; closeInfo(); }
@@ -1093,8 +1279,8 @@ function deleteGalaxy(gx){
   rebuild();
   autoSave();
   updateUndoBtn();
-  if (galaxies.length){ showOk(`Deleted "<b>${gx.topic}</b>". ${galaxies.length} galax${galaxies.length===1?'y':'ies'} left. Changed your mind? Hit <b>Recover last deleted galaxy</b>.`); setTimeout(fitAll, 300); }
-  else { localStorage.removeItem("kc_saved"); showOk(`Deleted "<b>${gx.topic}</b>" — your universe is empty now. Changed your mind? Hit <b>Recover last deleted galaxy</b>.`); }
+  if (galaxies.length){ showOk(`Deleted "<b>${escapeHtml(gx.topic)}</b>". ${galaxies.length} galax${galaxies.length===1?'y':'ies'} left. Changed your mind? Hit <b>Recover last deleted galaxy</b>.`); setTimeout(fitAll, 300); }
+  else { safeLocalRemove("kc_saved"); showOk(`Deleted "<b>${escapeHtml(gx.topic)}</b>" — your universe is empty now. Changed your mind? Hit <b>Recover last deleted galaxy</b>.`); }
 }
 
 function recoverLastDeleted(){
@@ -1117,16 +1303,16 @@ function recoverLastDeleted(){
   });
   // restore its notes into localStorage too
   try {
-    const all = JSON.parse(localStorage.getItem("kc_notes") || "{}");
+    const all = JSON.parse(safeLocalGet("kc_notes") || "{}");
     gx.nodes.forEach(n => { if (n.note) all[n.uid] = n.note; });
-    localStorage.setItem("kc_notes", JSON.stringify(all));
+    safeLocalSet("kc_notes", JSON.stringify(all));
   } catch(e){}
   galaxies.push(gx);
   lastDeleted = null;          // only the last one is recoverable, and only once
   rebuild();
   autoSave();
   updateUndoBtn();
-  showOk(`Recovered "<b>${gx.topic}</b>".`);
+  showOk(`Recovered "<b>${escapeHtml(gx.topic)}</b>".`);
   focusGalaxy(gx);
 }
 
@@ -1151,6 +1337,9 @@ function fitAll(){
 /* ---------------- Info panel + notes ---------------- */
 function showInfo(event, d){
   selectedNode = d;
+  // SECURITY: use textContent (via .innerText assignment of plain values is fine here
+  // since these are dedicated text-only elements, not innerHTML) — d.id / d.description /
+  // d.g.topic are all AI-/file-/link-controlled and must never go through innerHTML.
   document.getElementById("info-group").innerText = d.group===1?"central":d.group===2?"major":"detail";
   document.getElementById("info-title").innerText = d.id;
   document.getElementById("info-galaxy").innerText = "in galaxy: " + (d.g ? d.g.topic : "");
@@ -1166,18 +1355,19 @@ function deleteCurrentGalaxy(){ if (selectedNode && selectedNode.g) deleteGalaxy
 
 function saveNote(){
   if (!selectedNode) return;
-  selectedNode.note = document.getElementById("note-input").value;
-  const all = JSON.parse(localStorage.getItem("kc_notes") || "{}");
+  selectedNode.note = asStr(document.getElementById("note-input").value, 4000);
+  const all = JSON.parse(safeLocalGet("kc_notes") || "{}");
   all[selectedNode.uid] = selectedNode.note;
-  localStorage.setItem("kc_notes", JSON.stringify(all));
+  safeLocalSet("kc_notes", JSON.stringify(all));
   const saved = document.getElementById("saved-note");
   if (selectedNode.note){ saved.style.display='block'; saved.innerText="Saved note:\n"+selectedNode.note; }
   else { saved.style.display='none'; }
   autoSave();
 }
 function mergeNotes(){
-  const all = JSON.parse(localStorage.getItem("kc_notes") || "{}");
-  galaxies.forEach(gx => gx.nodes.forEach(n => { if (all[n.uid]) n.note = all[n.uid]; }));
+  let all = {};
+  try { all = JSON.parse(safeLocalGet("kc_notes") || "{}"); } catch(e){ all = {}; }
+  galaxies.forEach(gx => gx.nodes.forEach(n => { if (all[n.uid]) n.note = asStr(all[n.uid], 4000); }));
 }
 
 /* ---------------- Snapshot / save / load (whole universe) ---------------- */
@@ -1193,9 +1383,17 @@ function snapshot(){
   };
 }
 function loadSnapshot(snap){
-  galaxies = []; galaxySeq = 0;
+  if (!snap || typeof snap !== 'object') { showErr("That file/link wasn't a valid constellation."); return; }
   // support both the new {galaxies:[...]} and the old single {nodes,links,topic}
-  const arr = snap.galaxies ? snap.galaxies : [{ topic: snap.topic, nodes: snap.nodes, links: snap.links }];
+  const rawArr = Array.isArray(snap.galaxies) ? snap.galaxies
+    : [{ topic: snap.topic, nodes: snap.nodes, links: snap.links }];
+  // SECURITY: sanitize every galaxy's shape/types before touching live state,
+  // so a malformed or adversarial file/link can't inject unexpected fields
+  // or crash the renderer. Strings are still escaped later at render time.
+  const arr = rawArr.map(sanitizeGalaxyData).filter(Boolean);
+  if (!arr.length){ showErr("That file/link didn't contain any valid galaxies."); return; }
+
+  galaxies = []; galaxySeq = 0;
   arr.forEach((gd, i) => {
     const seq = galaxySeq++;
     const center = (gd.cx != null) ? { x: gd.cx, y: gd.cy } : galaxyCenter(i);
@@ -1210,9 +1408,7 @@ function loadSnapshot(snap){
     });
     if (!gx.central && gx.nodes.length) gx.central = gx.nodes[0];
     (gd.links||[]).forEach(l => {
-      const s = typeof l.source==='object'?l.source.id:l.source;
-      const t = typeof l.target==='object'?l.target.id:l.target;
-      if (idMap.has(s) && idMap.has(t)) gx.links.push({ source: idMap.get(s).uid, target: idMap.get(t).uid });
+      if (idMap.has(l.source) && idMap.has(l.target)) gx.links.push({ source: idMap.get(l.source).uid, target: idMap.get(l.target).uid });
     });
     galaxies.push(gx);
   });
@@ -1222,13 +1418,13 @@ function loadSnapshot(snap){
 
 function autoSave(){
   if (!galaxies.length) return;
-  try { localStorage.setItem("kc_saved", JSON.stringify(snapshot())); localStorage.setItem("kc_saved_at", Date.now()); } catch(e){}
+  if (safeLocalSet("kc_saved", JSON.stringify(snapshot()))) safeLocalSet("kc_saved_at", Date.now());
   updateSavedStamp();
 }
 function updateSavedStamp(){
   const el = document.getElementById('saved-stamp');
   if (!el) return;
-  const ts = Number(localStorage.getItem("kc_saved_at"));
+  const ts = Number(safeLocalGet("kc_saved_at"));
   if (!ts || !galaxies.length){ el.innerText = ""; return; }
   const t = new Date(ts);
   el.innerText = "Saved " + t.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
@@ -1266,19 +1462,22 @@ function copyExplanation(btn){
 function saveConstellation(){
   if (!galaxies.length){ showErr("Nothing to save yet — map a topic first."); return; }
   const slim = snapshot();
-  localStorage.setItem("kc_saved", JSON.stringify(slim));
+  safeLocalSet("kc_saved", JSON.stringify(slim));
   const blob = new Blob([JSON.stringify(slim,null,2)], {type:"application/json"});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  const name = (galaxies.length===1 ? galaxies[0].topic : "my_universe").replace(/\s+/g,'_');
+  const name = (galaxies.length===1 ? galaxies[0].topic : "my_universe").replace(/[^a-z0-9_\-]+/gi,'_').slice(0,80) || "constellation";
   a.download = name + ".json";
   a.click();
+  URL.revokeObjectURL(a.href);
   showOk("Saved a <b>.json file</b> to your downloads — keep it anywhere (Desktop, Drive, USB). Reopen it later by dragging it onto this page.");
 }
 function loadConstellation(){
-  const raw = localStorage.getItem("kc_saved");
+  const raw = safeLocalGet("kc_saved");
   if (!raw){ showErr("Nothing to load yet — map a topic first (it saves automatically), or drag a saved .json file onto the page."); return; }
-  loadSnapshot(JSON.parse(raw));
+  try {
+    loadSnapshot(JSON.parse(raw));
+  } catch(e){ showErr("Your saved data was corrupted and couldn't be loaded."); return; }
   document.getElementById('ui-panel').classList.add('shifted');
   hideErr();
   setTimeout(fitAll, 400);
@@ -1296,7 +1495,13 @@ function shareConstellation(){
   const linkUrl = base + (readonly ? "?readonly=1" : "") + "#z=" + packed;
 
   if (packed && linkUrl.length < 16000){
-    const safe = linkUrl.replace(/"/g,'&quot;');
+    // SECURITY: the link itself is built from location.href + our own
+    // compressed payload (not arbitrary user HTML), but it's still escaped
+    // before going into the value="..." attribute since it's interpolated
+    // via innerHTML below — and quotes inside a URL-safe base64-ish string
+    // shouldn't appear, but escapeAttr makes that guarantee explicit rather
+    // than assumed.
+    const safe = escapeAttr(linkUrl);
     showOk(
       (readonly ? "Read-only" : "Editable") + " share link ready — paste it in your class group / chat:" +
       "<input class='sharebox' readonly onclick='this.select()' value=\"" + safe + "\">" +
@@ -1320,14 +1525,20 @@ function loadFromHash(){
   let json = null;
   try {
     if (h.startsWith("#z=")) {                 // new: LZ-String compressed
-      json = LZString.decompressFromEncodedURIComponent(h.slice(3));
+      // SECURITY: basic shape check on the raw hash payload before even
+      // attempting decompression — keeps obviously-bogus fragments from
+      // wasting cycles or hitting odd LZString edge cases.
+      const payload = h.slice(3);
+      if (!payload || payload.length > 20000 || !/^[A-Za-z0-9+\-$]*$/.test(payload)) return false;
+      json = LZString.decompressFromEncodedURIComponent(payload);
     } else if (h.startsWith("#p=")) {          // old: base64 (back-compat)
       json = decodeURIComponent(escape(atob(h.slice(3))));
     } else {
       return false;
     }
     if (!json) return false;
-    loadSnapshot(JSON.parse(json));
+    const parsed = JSON.parse(json);
+    loadSnapshot(parsed);
     document.getElementById('ui-panel').classList.add('shifted');
     // read-only mode if the link says so
     if (/[?&]readonly=1/.test(location.search)) {
@@ -1359,7 +1570,7 @@ function startOver(){
   closeInfo();
   document.getElementById('topic-input').value = "";
   document.getElementById('ui-panel').classList.remove('shifted');
-  localStorage.removeItem("kc_saved"); localStorage.removeItem("kc_saved_at");
+  safeLocalRemove("kc_saved"); safeLocalRemove("kc_saved_at");
   if (location.hash) history.replaceState(null,"",location.pathname);
   svg.call(zoom.transform, d3.zoomIdentity);
   currentK = 1;
@@ -1380,8 +1591,23 @@ window.addEventListener('dragover', e=>e.preventDefault());
 window.addEventListener('drop', e=>{
   e.preventDefault();
   const f = e.dataTransfer.files[0]; if(!f) return;
+  // SECURITY: basic file sanity checks before reading — type/size limit
+  // avoids handing the renderer something wildly oversized or obviously
+  // not JSON, on top of the shape-sanitization done in loadSnapshot().
+  if (f.size > 8 * 1024 * 1024){ showErr("That file is too large to be a constellation export."); return; }
   const r = new FileReader();
-  r.onload = ()=>{ try{ loadSnapshot(JSON.parse(r.result)); document.getElementById('ui-panel').classList.add('shifted'); hideErr(); setTimeout(fitAll,400);}catch{ showErr("That file wasn't a valid constellation JSON."); } };
+  r.onload = ()=>{
+    try{
+      const parsed = JSON.parse(r.result);
+      loadSnapshot(parsed);
+      document.getElementById('ui-panel').classList.add('shifted');
+      hideErr();
+      setTimeout(fitAll,400);
+    }catch{
+      showErr("That file wasn't a valid constellation JSON.");
+    }
+  };
+  r.onerror = ()=>{ showErr("Couldn't read that file."); };
   r.readAsText(f);
 });
 
@@ -1426,17 +1652,23 @@ function galaxyDrag(){
 const keyInput = document.getElementById('api-key');
 // restore last-used provider, then its saved key + model list
 (function restoreProvider(){
-  const savedProvider = localStorage.getItem('kc_provider') || 'gemini';
+  const savedProvider = safeLocalGet('kc_provider') || 'gemini';
   document.getElementById('provider-select').value = savedProvider;
   updateProvider();   // fills model list, key label, and loads that provider's key
-  // migrate old single key into the gemini slot if present
-  if (savedProvider === 'gemini' && !keyInput.value && localStorage.getItem('kc_key')){
-    keyInput.value = localStorage.getItem('kc_key');
+  // SECURITY/hygiene: migrate the old unscoped 'kc_key' into the new
+  // provider-scoped slot ONCE, then remove the legacy key entirely, instead
+  // of leaving both copies sitting in storage indefinitely.
+  const legacy = safeLocalGet('kc_key');
+  if (legacy){
+    if (savedProvider === 'gemini' && !keyInput.value){
+      keyInput.value = legacy;
+      safeLocalSet('kc_key_gemini', legacy);
+    }
+    safeLocalRemove('kc_key');
   }
 })();
 keyInput.addEventListener('change', ()=>{
-  localStorage.setItem('kc_key_' + currentProvider(), keyInput.value.trim());
-  if (currentProvider() === 'gemini') localStorage.setItem('kc_key', keyInput.value.trim()); // back-compat
+  safeLocalSet('kc_key_' + currentProvider(), keyInput.value.trim());
 });
 document.getElementById('topic-input').addEventListener('keydown', e=>{ if(e.key==='Enter') generateGraph(); });
 
@@ -1457,12 +1689,19 @@ document.addEventListener('keydown', e=>{
 /* ---------------- Startup ---------------- */
 (function init(){
   if (loadFromHash()){ hideSuggestions(); return; }   // opened a shared link
-  const raw = localStorage.getItem("kc_saved");
+  const raw = safeLocalGet("kc_saved");
   if (raw){                              // bring back the last universe
-    try { loadSnapshot(JSON.parse(raw)); document.getElementById('ui-panel').classList.add('shifted'); hideSuggestions(); updateSavedStamp(); if (isMobile()) collapsePanel(); setTimeout(fitAll,500); return; } catch(e){}
+    try {
+      loadSnapshot(JSON.parse(raw));
+      document.getElementById('ui-panel').classList.add('shifted');
+      hideSuggestions(); updateSavedStamp();
+      if (isMobile()) collapsePanel();
+      setTimeout(fitAll,500);
+      return;
+    } catch(e){}
   }
-  if (!localStorage.getItem('kc_seen')){ // first-ever visit
-    localStorage.setItem('kc_seen','1');
+  if (!safeLocalGet('kc_seen')){ // first-ever visit
+    safeLocalSet('kc_seen','1');
   }
   showWelcome();
 })();
